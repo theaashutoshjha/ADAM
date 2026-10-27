@@ -129,6 +129,44 @@ Every trading call is evaluated against the 5 non-negotiable regulatory paramete
 
 ---
 
+## ☁️ Cloudflare Deployment Guide
+
+ADAM-AR combines a React 19 frontend with a high-throughput Node.js backend (`node:sqlite` WAL, FFmpeg, speech pipelines).
+
+### Deployment Architecture
+- **Frontend**: Deployed to Cloudflare Pages or Cloudflare Workers (`dist/`).
+- **Edge Reverse Proxy**: `_worker.js` and `functions/api/[[catchall]].ts` automatically proxy all `/api/*` calls from Cloudflare to your Node.js backend.
+- **Backend**: Hosted on any Node.js environment (VPS, Railway, Render, Fly.io, or local machine with Cloudflare Tunnel).
+
+### Steps to Deploy to Cloudflare:
+1. **Build and Deploy**:
+   ```bash
+   npm run build
+   npx wrangler deploy
+   ```
+2. **Configure Backend URL**:
+   In Cloudflare Dashboard: **Workers & Pages > adam > Settings > Variables**, add:
+   ```env
+   BACKEND_URL=https://api.yourdomain.com
+   ```
+3. **In-App Server Setup**:
+   If `BACKEND_URL` is not yet set in Cloudflare, click **"Configure Backend Server URL"** on the login screen to enter and save your active backend address directly in the browser.
+
+---
+
+## 🐙 GitHub Repository Setup
+
+1. **Remote Repository**:
+   ```bash
+   git remote add origin https://github.com/theaashutoshjha/ADAM.git
+   ```
+2. **Branch Management**:
+   Main development and production deployments track the `main` branch.
+3. **Environment Security**:
+   - The `.gitignore` file strictly blocks `.env`, `*.db`, `uploads/`, `recordings/`, and `dist/`.
+   - Never commit sensitive API keys or credentials to GitHub. Use `.env.example` as a template.
+
+
 ## 📂 Project Structure
 
 ```

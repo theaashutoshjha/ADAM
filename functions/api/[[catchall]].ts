@@ -32,7 +32,7 @@ export const onRequest = async (context: { request: Request; env: Env }): Promis
         ok: false,
         authenticated: false,
         error:
-          'Cloudflare Pages: BACKEND_URL environment variable is not configured. Set BACKEND_URL in Cloudflare Pages (Settings > Environment variables) pointing to your Node.js server (e.g. https://api.yourdomain.com), or click "Configure Server" on the login screen.',
+          'Cloudflare Pages: BACKEND_URL environment variable is not configured. Set BACKEND_URL in Cloudflare Pages (Settings > Environment variables) pointing to your Node.js server (e.g. https://api.yourdomain.com), or click "Configure Server" on the login screen to enter your backend URL.',
       }),
       {
         status: 503,

@@ -293,7 +293,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onBack
 
       onLoginSuccess(user, token);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Unable to authenticate. Please check your credentials.');
+      const msg = err.message || 'Unable to authenticate. Please check your credentials.';
+      setErrorMessage(msg);
+      if (
+        msg.includes('405') ||
+        msg.includes('503') ||
+        msg.includes('502') ||
+        msg.includes('Backend') ||
+        msg.includes('Cloudflare') ||
+        msg.includes('unreachable') ||
+        msg.includes('Network Error')
+      ) {
+        setShowServerConfig(true);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -339,7 +351,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onBack
             </div>
             {(errorMessage.includes('Cloudflare') ||
               errorMessage.includes('Backend') ||
+              errorMessage.includes('405') ||
               errorMessage.includes('404') ||
+              errorMessage.includes('503') ||
               errorMessage.includes('502') ||
               errorMessage.includes('521') ||
               errorMessage.includes('unreachable') ||

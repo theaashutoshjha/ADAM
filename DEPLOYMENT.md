@@ -137,12 +137,37 @@ find /var/backups/auditeq/ -type f -name "*.db.gz" -mtime +30 -delete
 
 ---
 
-## 6. Cloudflare Deployment Guide
+## 6. Cloudflare Deployment Architecture & Setup
 
-### Architecture Options
+### Architecture Overview
 
-#### Option A: Cloudflare Tunnel (Full-Stack Node.js Server — Recommended)
-Run the Node.js server (`node dist/server.cjs`) on your server/VPS and expose it securely via Cloudflare Tunnel without opening ports:
+ADAM-AR requires a Node.js runtime (`>=20.12.0`, Node 22+ recommended) for its backend services due to:
+- Native **SQLite WAL** database engine (`node:sqlite` `DatabaseSync`)
+- Native **FFmpeg** audio processing and multi-channel DSP splitting
+- Large audio ZIP file streaming and unzipping (`multer`, `adm-zip`)
+- Background transcription worker queue processing
+
+Because serverless edge environments (Cloudflare Pages Functions / Workers) run on lightweight V8 isolates without a local filesystem or Node C++ binaries, the application uses a **Decoupled Architecture**:
+
+```
+[Browser Client]
+       │
+       ▼
+[Cloudflare Pages / Workers]  ──(Serves React SPA & Static Assets from /dist)
+       │
+       ├── /api/* requests proxied via _worker.js / [[catchall]].ts
+       │
+       ▼
+[Node.js Backend Server]      ──(Express + SQLite WAL + Dual ASR + DSP)
+ (VPS, Render, Railway, EC2, or Local + Cloudflare Tunnel)
+```
+
+---
+
+### Deployment Methods
+
+#### Method 1: Cloudflare Tunnel (Full-Stack Node.js Server — Most Streamlined)
+Run the bundled Node.js server (`node dist/server.cjs`) on your server/VPS and expose it securely via Cloudflare Tunnel without opening firewall ports:
 ```bash
 # 1. Install cloudflared
 curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
@@ -159,9 +184,34 @@ cloudflared tunnel route dns adam-tunnel compliance.brokerage.com
 cloudflared tunnel run --url http://localhost:3000 adam-tunnel
 ```
 
-#### Option B: Cloudflare Pages (Frontend) + External Node Backend
-If you deploy the frontend build (`dist/`) directly to Cloudflare Pages:
-1. In Cloudflare Pages Dashboard, navigate to **Settings > Environment variables**.
-2. Add variable `BACKEND_URL` pointing to your deployed Node.js backend (e.g. `https://api.yourdomain.com`).
-3. The built-in Cloudflare Pages Function (`functions/api/[[catchall]].ts`) will automatically proxy all `/api/*` calls to your backend server.
-4. Alternatively, click **"Configure Server"** directly on the Login Screen to specify the backend host URL at any time.
+#### Method 2: Cloudflare Workers with Static Assets (`wrangler deploy`)
+Deploy the frontend static assets and edge proxy directly using Wrangler:
+1. Ensure your backend Node.js server is running and publicly reachable (e.g., `https://api.yourdomain.com`).
+2. Set the `BACKEND_URL` environment variable:
+   - In Cloudflare Dashboard: **Workers & Pages > adam > Settings > Variables** -> add `BACKEND_URL` = `https://api.yourdomain.com`.
+   - Or in `.env` / Wrangler secrets: `npx wrangler secret put BACKEND_URL`.
+3. Deploy:
+   ```bash
+   npm run build
+   npx wrangler deploy
+   ```
+4. The included `dist/_worker.js` automatically proxies all `/api/*` calls (GET, POST, PUT, DELETE, OPTIONS) to your Node.js backend.
+
+#### Method 3: Cloudflare Pages
+If connected via Git to Cloudflare Pages:
+1. **Build command**: `npm run build`
+2. **Build output directory**: `dist`
+3. In Cloudflare Pages Dashboard, navigate to **Settings > Environment variables**.
+4. Add variable `BACKEND_URL` pointing to your deployed Node.js backend (e.g. `https://api.yourdomain.com`).
+5. All `/api/*` requests will be proxied automatically via `_worker.js` / `functions/api/[[catchall]].ts`.
+
+---
+
+### In-App Backend Host Configuration (Instant Fallback)
+
+If `BACKEND_URL` has not been set in Cloudflare environment variables:
+1. Open the ADAM-AR Login Screen.
+2. Click **"Configure Backend Server URL"** (or it auto-expands on connectivity errors).
+3. Enter your backend host (e.g., `https://api.yourdomain.com` or local tunnel address).
+4. Click **"Save & Test"**. The connection is tested against `/api/health` and saved in browser storage.
+

@@ -107,6 +107,11 @@ export async function safeParseJsonResponse<T = any>(response: Response): Promis
 
   if (!text || text.trim().length === 0) {
     if (!response.ok) {
+      if (response.status === 405) {
+        throw new Error(
+          `Backend server not reachable at this address (HTTP 405 Method Not Allowed). The frontend is hosted statically without a live backend connection. Please click "Configure Backend Server URL" below to enter your active Node.js server address (or configure BACKEND_URL in Cloudflare).`
+        );
+      }
       throw new Error(`Server returned HTTP ${response.status} (${response.statusText || 'Empty Response'}). Backend server may be offline or unreachable.`);
     }
     return {} as T;
@@ -115,8 +120,13 @@ export async function safeParseJsonResponse<T = any>(response: Response): Promis
   // Check if response is HTML (e.g. Cloudflare error page, 404, or SPA fallback index.html)
   const trimmed = text.trim();
   if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html') || trimmed.startsWith('<head')) {
+    if (response.status === 405) {
+      throw new Error(
+        `Backend server not reachable at this address (HTTP 405 Method Not Allowed). The frontend is hosted statically without a live backend connection. Please click "Configure Backend Server URL" below to enter your active Node.js server address (or configure BACKEND_URL in Cloudflare).`
+      );
+    }
     if (response.status === 404) {
-      throw new Error(`Backend API endpoint not found (HTTP 404). If deploying frontend on Cloudflare Pages, please set your Backend Server URL.`);
+      throw new Error(`Backend API endpoint not found (HTTP 404). If deploying frontend on Cloudflare Pages/Workers, please set your Backend Server URL.`);
     }
     if (response.status === 502 || response.status === 521 || response.status === 522 || response.status === 524) {
       throw new Error(`Cloudflare Gateway Error (HTTP ${response.status}): The backend Node.js server is offline or unreachable.`);
