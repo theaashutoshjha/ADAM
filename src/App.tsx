@@ -32,6 +32,8 @@ const AdminView = lazy(() => import('./components/AdminView').then((m) => ({ def
 const ReleaseReadinessView = lazy(() => import('./components/ReleaseReadinessView').then((m) => ({ default: m.ReleaseReadinessView })));
 const IngestionWorkspace = lazy(() => import('./components/IngestionWorkspace').then((m) => ({ default: m.IngestionWorkspace })));
 const WorkspaceParametersView = lazy(() => import('./components/WorkspaceParametersView').then((m) => ({ default: m.WorkspaceParametersView })));
+const AdvisorPerformanceView = lazy(() => import('./components/AdvisorPerformanceView').then((m) => ({ default: m.AdvisorPerformanceView })));
+const ClientAnalysisView = lazy(() => import('./components/ClientAnalysisView').then((m) => ({ default: m.ClientAnalysisView })));
 import { api, clearStoredToken, getStoredToken, setStoredToken, setStoredWorkspace, getApiUrl, safeParseJsonResponse } from './lib/api';
 
 import type {
@@ -809,7 +811,30 @@ export function App() {
               />
             )}
 
-            {(activeTab === 'master_table' || activeTab === 'clients' || activeTab === 'advisors' || activeTab === 'teams') && (
+            {activeTab === 'advisors' && (
+              <AdvisorPerformanceView
+                scorecards={scorecards || []}
+                calls={calls || []}
+                advisors={advisors || []}
+                onSelectCall={(_call) => setActiveTab('calls')}
+                isLoading={isLoading}
+                dateRange={effectiveDateRange}
+              />
+            )}
+
+            {activeTab === 'clients' && (
+              <ClientAnalysisView
+                trades={trades || []}
+                calls={calls || []}
+                scorecards={scorecards || []}
+                preOrdersSummary={preOrdersSummary}
+                onSelectCall={(_call) => setActiveTab('calls')}
+                isLoading={isLoading}
+                dateRange={effectiveDateRange}
+              />
+            )}
+
+            {(activeTab === 'master_table' || activeTab === 'teams') && (
               <AuditedMasterView
                 scorecards={scorecards || []}
                 onUpdateScorecard={handleUpdateScorecard}
@@ -868,7 +893,7 @@ export function App() {
               />
             )}
 
-            {(activeTab === 'reports' || activeTab === 'advisor_reports' || activeTab === 'team_reports' || activeTab === 'scorecard_reports' || activeTab === 'exports') && (
+            {(activeTab === 'reports' || activeTab === 'advisor_reports' || activeTab === 'team_reports' || activeTab === 'scorecard_reports') && (
               <ReportsView
                 archives={archives}
                 scorecards={scorecards}
@@ -876,6 +901,19 @@ export function App() {
                 advisors={advisors}
                 isLoading={isLoading}
                 dateRange={effectiveDateRange}
+                defaultTab="analytics"
+              />
+            )}
+
+            {activeTab === 'exports' && (
+              <ReportsView
+                archives={archives}
+                scorecards={scorecards}
+                calls={calls}
+                advisors={advisors}
+                isLoading={isLoading}
+                dateRange={effectiveDateRange}
+                defaultTab="ledger"
               />
             )}
 
@@ -897,8 +935,12 @@ export function App() {
               <LogsView logs={logs} isLoading={isLoading} />
             )}
 
-            {(activeTab === 'admin' || activeTab === 'security') && (
-              <AdminView onRefreshStats={fetchAllData} />
+            {activeTab === 'admin' && (
+              <AdminView onRefreshStats={fetchAllData} initialTab="processing" />
+            )}
+
+            {activeTab === 'security' && (
+              <AdminView onRefreshStats={fetchAllData} initialTab="users" />
             )}
 
             {activeTab === 'maintenance' && (

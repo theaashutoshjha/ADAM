@@ -259,6 +259,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onBack
       if (selectedWorkspace !== 'auto') {
         headers['X-AuditEQ-Workspace'] = selectedWorkspace;
       }
+      const customBase = getApiBaseUrl();
+      if (customBase) {
+        headers['X-Backend-Url'] = customBase;
+      }
 
       const loginUrl = getApiUrl('/api/auth/login');
       let res: Response;

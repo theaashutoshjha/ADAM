@@ -522,7 +522,7 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
           </button>
         </div>
 
-        {pipelineCheck && (
+        {pipelineCheck && pipelineCheck.checks && typeof pipelineCheck.checks === 'object' && (
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
             {Object.entries(pipelineCheck.checks).map(([serviceKey, check]) => {
               const isHealthy = check.status === 'healthy';

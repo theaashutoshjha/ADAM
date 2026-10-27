@@ -162,6 +162,11 @@ export async function apiRequest<T = any>(
     headers.set('X-AuditEQ-Database', activeDb);
   }
 
+  const customBase = getApiBaseUrl();
+  if (customBase) {
+    headers.set('X-Backend-Url', customBase);
+  }
+
   const url = getApiUrl(endpoint);
   let response: Response;
   try {

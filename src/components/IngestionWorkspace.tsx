@@ -155,14 +155,15 @@ export const IngestionWorkspace: React.FC<IngestionWorkspaceProps> = ({
     try {
       setTradeReportState((prev) => ({ ...prev, status: 'VALIDATING', message: 'Parsing orders, stock symbols, and client codes...' }));
       const res = await api.uploadTrades(tradeReportState.file);
+      const count = (res as any).accepted_rows ?? res.imported ?? 0;
       setTradeReportState({
         file: null,
         status: 'SUCCESS',
-        batchId: `BATCH_TRD_${Date.now().toString().slice(-6)}`,
-        acceptedRows: res.imported || 0,
+        batchId: (res as any).batch_id || `BATCH_TRD_${Date.now().toString().slice(-6)}`,
+        acceptedRows: count,
         rejectedRows: 0,
-        duplicates: 0,
-        message: res.message || 'Trades imported and ready for Pre-Order correlation.',
+        duplicates: (res as any).merged_split_trades || 0,
+        message: res.message || `Successfully imported ${count} trade execution(s) into database.`,
       });
       if (onRefreshAll) onRefreshAll();
     } catch (err: any) {
@@ -189,14 +190,15 @@ export const IngestionWorkspace: React.FC<IngestionWorkspaceProps> = ({
         message: 'Validating Column C (Call ID), Column E (Customer Number), and Column Y (TataTele Recording URLs)...',
       }));
       const res = await api.uploadCalls(formData);
+      const count = (res as any).accepted_rows ?? (res as any).imported ?? 0;
       setMetadataState({
         file: null,
         status: 'SUCCESS',
         batchId: (res as any).batch_id || `BATCH_META_${Date.now().toString().slice(-6)}`,
-        acceptedRows: (res as any).imported || 0,
+        acceptedRows: count,
         rejectedRows: 0,
         duplicates: 0,
-        message: res.message || 'Metadata processed. TataTele Column Y auto-downloader started!',
+        message: res.message || `Processed ${count} call metadata record(s). TataTele Column Y auto-downloader active!`,
       });
       // Immediately refresh download status
       await fetchDownloadStatus();

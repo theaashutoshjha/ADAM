@@ -1,7 +1,7 @@
 import fs from 'node:fs';
-import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { downloadCloudAudio } from './audioDownloader';
+import { correlatePreOrdersWithCalls } from './pipeline/preOrderClusterEngine';
 
 export interface DownloadProgress {
   isDownloading: boolean;
@@ -53,8 +53,8 @@ class TataAutoDownloader {
       SELECT id, canonical_call_id, caller_id, original_filename, recording_url, storage_path
       FROM calls
       WHERE recording_url IS NOT NULL 
-        AND length(trim(recording_url)) > 15
-        AND (recording_url LIKE 'http%://cloudphone.tatateleservices.com%' OR recording_url LIKE 'http%://tatateleservices.com%')
+        AND length(trim(recording_url)) > 8
+        AND (recording_url LIKE 'http://%' OR recording_url LIKE 'https://%')
       ORDER BY id ASC
     `).all() as unknown as Array<{
       id: number;
@@ -133,6 +133,14 @@ class TataAutoDownloader {
         this.progress.currentCallId = undefined;
         this.progress.lastUpdated = new Date().toISOString();
         console.log(`[TataDownloader] Completed downloading: ${this.progress.completed} downloaded, ${this.progress.failed} failed.`);
+        if (this.progress.completed > 0) {
+          try {
+            console.log('[TataDownloader] Re-evaluating 10-Minute Pre-Order Correlation on newly downloaded audio recordings...');
+            correlatePreOrdersWithCalls(db);
+          } catch (corrErr: any) {
+            console.error('[TataDownloader] Error correlating pre-orders after download:', corrErr?.message);
+          }
+        }
       }
     })();
 

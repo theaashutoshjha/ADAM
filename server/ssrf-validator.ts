@@ -78,6 +78,9 @@ export const DEFAULT_ALLOWED_HOSTS = [
   'cloudphone.tatateleservices.com',
   'tatateleservices.com',
   '*.tatateleservices.com',
+  'smartflo.tatateleservices.com',
+  '*.smartflo.tatateleservices.com',
+  'api-smartflo.tatateleservices.com',
   's3.amazonaws.com',
   '*.amazonaws.com',
   'storage.googleapis.com',
@@ -88,7 +91,7 @@ export const DEFAULT_ALLOWED_HOSTS = [
 ];
 
 /**
- * Validates whether a given URL is strictly HTTPS, resolves to a public, non-private IP,
+ * Validates whether a given URL is HTTP/HTTPS, resolves to a public, non-private IP,
  * and matches allowed audio or external provider hosts.
  */
 export async function validateSafeUrl(
@@ -102,9 +105,9 @@ export async function validateSafeUrl(
     return { isSafe: false, error: 'Malformed or unparseable URL' };
   }
 
-  // 1. Strict Protocol Enforcement: HTTPS Only
-  if (parsed.protocol !== 'https:') {
-    return { isSafe: false, error: `Insecure protocol "${parsed.protocol}". Only HTTPS is permitted.` };
+  // 1. Strict Protocol Enforcement: HTTPS or HTTP permitted for telephony & external audio
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    return { isSafe: false, error: `Insecure protocol "${parsed.protocol}". Only HTTPS and HTTP are permitted.` };
   }
 
   const hostname = parsed.hostname.toLowerCase();

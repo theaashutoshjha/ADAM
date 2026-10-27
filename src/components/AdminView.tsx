@@ -32,9 +32,18 @@ interface AdminUser {
 
 interface AdminViewProps {
   onRefreshStats?: () => Promise<void>;
+  initialTab?: 'processing' | 'users' | 'database';
 }
 
-export const AdminView: React.FC<AdminViewProps> = ({ onRefreshStats }) => {
+export const AdminView: React.FC<AdminViewProps> = ({ onRefreshStats, initialTab = 'processing' }) => {
+  const [currentTab, setCurrentTab] = useState<'processing' | 'users' | 'database'>(initialTab);
+
+  useEffect(() => {
+    if (initialTab) {
+      setCurrentTab(initialTab);
+    }
+  }, [initialTab]);
+
   // Users state
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
@@ -80,9 +89,10 @@ export const AdminView: React.FC<AdminViewProps> = ({ onRefreshStats }) => {
     setIsLoadingUsers(true);
     try {
       const data = await api.getAdminUsers();
-      setUsers(data || []);
+      setUsers(Array.isArray(data) ? data : []);
     } catch (err: unknown) {
       console.error('Failed to load users:', err);
+      setUsers([]);
     } finally {
       setIsLoadingUsers(false);
     }
@@ -92,9 +102,10 @@ export const AdminView: React.FC<AdminViewProps> = ({ onRefreshStats }) => {
     setIsLoadingBackups(true);
     try {
       const res = await api.getClearedBackups();
-      setBackups(res.backups || []);
+      setBackups(Array.isArray(res?.backups) ? res.backups : []);
     } catch (err) {
       console.error('Failed to load cleared backups:', err);
+      setBackups([]);
     } finally {
       setIsLoadingBackups(false);
     }
@@ -278,10 +289,53 @@ export const AdminView: React.FC<AdminViewProps> = ({ onRefreshStats }) => {
         </div>
       )}
 
+      {/* Sub-Navigation Switcher */}
+      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-[#0b1329]/90 border border-teal-500/20 rounded-2xl shadow-lg backdrop-blur-md">
+        <button
+          type="button"
+          onClick={() => setCurrentTab('processing')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            currentTab === 'processing'
+              ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md shadow-amber-500/20 font-black'
+              : 'text-slate-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Cpu className="w-4 h-4" />
+          <span>Processing Key Pool &amp; Model Engine</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCurrentTab('users')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            currentTab === 'users'
+              ? 'bg-gradient-to-r from-teal-400 to-emerald-500 text-slate-950 shadow-md shadow-teal-500/20 font-black'
+              : 'text-slate-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>Team &amp; User Access Management</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCurrentTab('database')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            currentTab === 'database'
+              ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-slate-950 shadow-md shadow-blue-500/20 font-black'
+              : 'text-slate-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Database className="w-4 h-4" />
+          <span>Cloud Database &amp; Archives</span>
+        </button>
+      </div>
+
       {/* Grid: Multi-User Management & Cloud/Database Controls */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Team & User Management (7 cols) */}
-        <div className="lg:col-span-7 space-y-6">
+        {/* Team & User Management Section */}
+        {currentTab === 'users' && (
+          <div className="lg:col-span-12 space-y-6">
           {/* User Creation Form */}
           <div className="glass-panel p-6 rounded-2xl shadow-xl space-y-4">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
@@ -392,8 +446,9 @@ export const AdminView: React.FC<AdminViewProps> = ({ onRefreshStats }) => {
 
           {/* User List Table (Only Newly Created Team Members) */}
           {(() => {
-            const createdTeamMembers = users.filter(
+            const createdTeamMembers = (Array.isArray(users) ? users : []).filter(
               (u) =>
+                u &&
                 u.email?.toLowerCase() !== 'ashutosh.kumar@fundsindia.com' &&
                 u.username?.toLowerCase() !== 'ashutosh.kumar@fundsindia.com' &&
                 u.id !== 1
@@ -496,9 +551,11 @@ export const AdminView: React.FC<AdminViewProps> = ({ onRefreshStats }) => {
             );
           })()}
         </div>
+      )}
 
-        {/* Right Column: Key Pool & Cloud/Database Hosting (5 cols) */}
-        <div className="lg:col-span-5 space-y-6">
+      {/* Processing Key Pool & Model Engine Section */}
+      {currentTab === 'processing' && (
+        <div className="lg:col-span-12 space-y-6">
           {/* Key Pool Manager (1 to 20 Keys) */}
           <div className="glass-panel p-6 rounded-2xl shadow-xl space-y-4">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
@@ -537,7 +594,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onRefreshStats }) => {
             )}
 
             {geminiPool?.keys && geminiPool.keys.length > 0 && (
-              <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                 <div className="text-[11px] font-bold text-neutral-300">Active Pool Keys:</div>
                 {geminiPool.keys.map((k: any) => (
                   <div key={k.index} className="flex items-center justify-between text-xs bg-slate-900/80 p-2 rounded-lg border border-white/5 font-mono">
@@ -584,10 +641,44 @@ export const AdminView: React.FC<AdminViewProps> = ({ onRefreshStats }) => {
             </form>
           </div>
 
-          {/* Cloud Database Hosting Configuration */}
+          {/* Parallel Worker Concurrency & Model Runtime */}
           <div className="glass-panel p-6 rounded-2xl shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
+            <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2 border-b border-white/10 pb-3">
+              <Cpu className="w-4 h-4 text-teal-400" />
+              <span>Parallel Pipeline Workers &amp; Execution Concurrency</span>
+            </h3>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-bold text-neutral-300">
+                  Max Parallel Processing Workers
+                </label>
+                <span className="text-xs font-mono font-bold text-teal-400">{concurrencyWorkers} Concurrent Workers</span>
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={6}
+                value={concurrencyWorkers}
+                onChange={(e) => setConcurrencyWorkers(Number(e.target.value))}
+                className="w-full accent-teal-400 cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] text-neutral-400 font-mono mt-0.5">
+                <span>1 (Sequential / Rate-Safe)</span>
+                <span>3 (Recommended)</span>
+                <span>6 (Turbo Parallel)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cloud Database & Backups Section */}
+      {currentTab === 'database' && (
+        <div className="lg:col-span-12 space-y-6">
+          <div className="glass-panel p-6 rounded-2xl shadow-xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <h3 className="text-xs font-bold text-neutral-100 flex items-center gap-2">
                 <Cloud className="w-4 h-4 text-teal-400" />
                 <span>Cloud &amp; Database Hosting</span>
               </h3>
@@ -782,6 +873,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onRefreshStats }) => {
             </div>
           </div>
         </div>
+      )}
       </div>
 
       {/* Password Reset Modal */}

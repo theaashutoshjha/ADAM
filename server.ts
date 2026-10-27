@@ -2092,7 +2092,9 @@ function parseTradeRecordsFromFile(filePath: string): ParsedTradeRow[] {
     }
 
     const cleanClientCandidate = formatCleanClientCode(rawClient);
-    let client = (cleanClientCandidate && isStrictValidClientCode(cleanClientCandidate)) ? cleanClientCandidate : '';
+    let client = (cleanClientCandidate && isStrictValidClientCode(cleanClientCandidate))
+      ? cleanClientCandidate
+      : (rawClient ? String(rawClient).trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '') : '');
     if (['UNKNOWN', 'NA', 'N/A', 'NULL', 'NONE', 'UNDEFINED'].includes(client)) {
       client = '';
     }
@@ -5483,16 +5485,33 @@ ${call.transcript || '(No speech transcript recorded)'}
           norm['recordingurl'] ??
           norm['recordinglink'] ??
           norm['audio'] ??
+          norm['audiourl'] ??
+          norm['audiolink'] ??
+          norm['recordingfile'] ??
           norm['url'] ??
           ''
         ).trim();
 
-        // Also scan row values for TataTele cloudphone recording URLs
+        // Also scan row values for TataTele / Smartflo cloudphone recording URLs or audio links
         if (!recordingUrl || !recordingUrl.startsWith('http')) {
           for (const val of Object.values(m)) {
             const strVal = String(val || '').trim();
-            if (strVal.includes('cloudphone.tatateleservices.com/file/recording') || strVal.includes('tatateleservices.com/file/recording')) {
-              recordingUrl = strVal;
+            if (
+              strVal.startsWith('http://') ||
+              strVal.startsWith('https://')
+            ) {
+              if (
+                strVal.includes('tatateleservices.com') ||
+                strVal.includes('smartflo') ||
+                strVal.includes('recording') ||
+                strVal.includes('.mp3') ||
+                strVal.includes('.wav')
+              ) {
+                recordingUrl = strVal;
+                break;
+              }
+            } else if (strVal.includes('tatateleservices.com') || strVal.includes('smartflo')) {
+              recordingUrl = `https://${strVal.replace(/^\/+/, '')}`;
               break;
             }
           }
@@ -5806,6 +5825,7 @@ ${call.transcript || '(No speech transcript recorded)'}
           ok: true,
           batch_id: newBatchResult?.batch_id || `BATCH-META-${Date.now()}`,
           imported: totalHandled,
+          accepted_rows: totalHandled,
           start_call_id: newBatchResult?.start_call_id,
           end_call_id: newBatchResult?.end_call_id,
           message: returnMsg,
@@ -5842,6 +5862,7 @@ ${call.transcript || '(No speech transcript recorded)'}
         ok: true,
         batch_id: batchResult.batch_id,
         imported: batchResult.total_uploaded,
+        accepted_rows: batchResult.total_uploaded,
         start_call_id: batchResult.start_call_id,
         end_call_id: batchResult.end_call_id,
         message: `Batch ${batchResult.batch_id} imported successfully: ${batchResult.total_uploaded} recording(s) logged (Database IDs #${batchResult.start_call_id} to #${batchResult.end_call_id}). 24/7 Autonomous AI Worker engaged.`,
@@ -6221,7 +6242,9 @@ ${call.transcript || '(No speech transcript recorded)'}
 
       return res.json({
         ok: true,
+        batch_id: `BATCH_TRD_${Date.now().toString().slice(-6)}`,
         imported,
+        accepted_rows: imported,
         merged_split_trades: dbMergeResult.mergedRows,
         matches_triggered: imported,
         audits_triggered: 0,
@@ -10043,6 +10066,7 @@ ${call.transcript || '(No speech transcript recorded)'}
       try {
         const resp = await fetch('https://api.groq.com/openai/v1/models', {
           headers: { Authorization: `Bearer ${groqKey}` },
+          signal: AbortSignal.timeout(4000),
         });
         const lat = Date.now() - start;
         checks.groq = resp.ok
@@ -10060,7 +10084,9 @@ ${call.transcript || '(No speech transcript recorded)'}
     if (geminiKey) {
       const start = Date.now();
       try {
-        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${geminiKey}`);
+        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${geminiKey}`, {
+          signal: AbortSignal.timeout(4000),
+        });
         const lat = Date.now() - start;
         checks.gemini = resp.ok
           ? { status: 'healthy', latency_ms: lat, message: `Connected (${lat}ms). Gemini 2.5 Flash / 3.5 online.` }

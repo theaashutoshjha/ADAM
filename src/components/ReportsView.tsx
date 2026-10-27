@@ -98,6 +98,7 @@ interface ReportsViewProps {
   advisors?: string[];
   isLoading?: boolean;
   dateRange?: string;
+  defaultTab?: 'ledger' | 'analytics' | 'archives';
 }
 
 export const ReportsView: React.FC<ReportsViewProps> = ({
@@ -107,11 +108,18 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   advisors = [],
   isLoading = false,
   dateRange,
+  defaultTab = 'ledger',
 }) => {
   const { playCall, activeCall, isPlaying } = useAudioPlayer();
 
   // Active view section
-  const [activeTab, setActiveTab] = useState<'ledger' | 'analytics' | 'archives'>('ledger');
+  const [activeTab, setActiveTab] = useState<'ledger' | 'analytics' | 'archives'>(defaultTab);
+
+  useEffect(() => {
+    if (defaultTab) {
+      setActiveTab(defaultTab);
+    }
+  }, [defaultTab]);
 
   // Filters State
   const [searchTerm, setSearchTerm] = useState('');
