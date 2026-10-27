@@ -545,6 +545,18 @@ sqlite.exec(`
   ON scorecards(resolved_trade_id)
   WHERE resolved_trade_id IS NOT NULL AND resolved_trade_id > 0;
 
+  CREATE INDEX IF NOT EXISTS idx_calls_call_date ON calls(call_date);
+  CREATE INDEX IF NOT EXISTS idx_calls_status ON calls(status);
+  CREATE INDEX IF NOT EXISTS idx_calls_classification ON calls(classification);
+  CREATE INDEX IF NOT EXISTS idx_calls_client_code ON calls(client_code);
+  CREATE INDEX IF NOT EXISTS idx_scorecards_call_id ON scorecards(call_id);
+  CREATE INDEX IF NOT EXISTS idx_scorecards_client_code ON scorecards(client_code);
+  CREATE INDEX IF NOT EXISTS idx_trades_client ON trades(client);
+  CREATE INDEX IF NOT EXISTS idx_trades_date ON trades(trade_date);
+  CREATE INDEX IF NOT EXISTS idx_matches_call_id ON matches(call_id);
+  CREATE INDEX IF NOT EXISTS idx_matches_trade_id ON matches(trade_id);
+  CREATE INDEX IF NOT EXISTS idx_audits_call_id ON audits(call_id);
+
   CREATE TABLE IF NOT EXISTS jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     job_type TEXT NOT NULL,
@@ -1296,14 +1308,36 @@ function redactSensitiveData(text: string): string {
     .replace(/(?:\+?91)?[6-9]\d{5}(\d{4})/g, '******$1');
 }
 
+let logsTableHasEvent: boolean | null = null;
+
 function addLog(level: 'info' | 'warning' | 'error' | 'debug', event: string, message: string, context?: unknown) {
   const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
   try {
     const sanitizedMsg = redactSensitiveData(String(message)).slice(0, 1000);
     const sanitizedCtx = context ? redactSensitiveData(JSON.stringify(context)) : null;
-    sqlite
-      .prepare('INSERT INTO logs (level, event, message, context, created_at) VALUES (?, ?, ?, ?, ?)')
-      .run(level, event, sanitizedMsg, sanitizedCtx, now);
+
+    if (logsTableHasEvent === null) {
+      try {
+        const info = sqlite.prepare("PRAGMA table_info(logs)").all() as Array<{ name: string }>;
+        logsTableHasEvent = info.some((c) => c.name === 'event');
+        if (!logsTableHasEvent) {
+          sqlite.exec('ALTER TABLE logs ADD COLUMN event TEXT DEFAULT "system";');
+          logsTableHasEvent = true;
+        }
+      } catch {
+        logsTableHasEvent = false;
+      }
+    }
+
+    if (logsTableHasEvent) {
+      sqlite
+        .prepare('INSERT INTO logs (level, event, message, context, created_at) VALUES (?, ?, ?, ?, ?)')
+        .run(level, event, sanitizedMsg, sanitizedCtx, now);
+    } else {
+      sqlite
+        .prepare('INSERT INTO logs (level, message, context, created_at) VALUES (?, ?, ?, ?)')
+        .run(level, sanitizedMsg, sanitizedCtx, now);
+    }
   } catch (err) {
     console.error('Failed to write log:', err);
   }
@@ -4130,7 +4164,7 @@ async function startServer() {
   // -----------------------------------------------------------
   apiRouter.get('/calls', requireAuth, (req: Request, res: Response) => {
     const rawLimit = req.query.per_page || req.query.limit;
-    const limit = rawLimit === 'all' ? 20000 : (parseInt(rawLimit as string, 10) || 5000);
+    const limit = rawLimit === 'all' ? 20000 : (parseInt(rawLimit as string, 10) || 500);
     const rawType = (req.query.type || req.query.classification) as string | undefined;
     const type = rawType ? rawType.toLowerCase().replace('-', '_') : undefined;
 
@@ -4159,7 +4193,7 @@ async function startServer() {
         c.call_type,
         c.classification,
         c.transcript,
-        c.transcript_raw,
+        NULL as transcript_raw,
         c.transcript_model,
         sc.score as score,
         sc.score as scorecard_score,
@@ -4214,7 +4248,7 @@ async function startServer() {
         'pre_order' as call_type,
         'PRE_ORDER' as classification,
         c.transcript,
-        c.transcript_raw,
+        NULL as transcript_raw,
         c.transcript_model,
         sc.score as score,
         sc.score as scorecard_score,
@@ -6031,7 +6065,7 @@ ${call.transcript || '(No speech transcript recorded)'}
   // Trades Endpoints (XLSX, XLS, CSV Parser)
   // -----------------------------------------------------------
   apiRouter.get('/trades', requireAuth, (req: Request, res: Response) => {
-    const limit = req.query.per_page === 'all' ? 20000 : (parseInt(req.query.per_page as string, 10) || 5000);
+    const limit = req.query.per_page === 'all' ? 20000 : (parseInt(req.query.per_page as string, 10) || 500);
     const trades = sqlite.prepare('SELECT * FROM trades ORDER BY id DESC LIMIT ?').all(limit) as unknown as TradeRecord[];
     const normalized = trades.map((t) => ({
       ...t,
@@ -6599,7 +6633,7 @@ ${call.transcript || '(No speech transcript recorded)'}
   // Matching Engine Endpoints
   // -----------------------------------------------------------
   apiRouter.get('/matches', requireAuth, (req: Request, res: Response) => {
-    const limit = req.query.per_page === 'all' ? 20000 : (parseInt(req.query.per_page as string, 10) || 5000);
+    const limit = req.query.per_page === 'all' ? 20000 : (parseInt(req.query.per_page as string, 10) || 300);
     const matches = sqlite
       .prepare(`
         SELECT m.*,
@@ -6635,7 +6669,7 @@ ${call.transcript || '(No speech transcript recorded)'}
   // Audits & Scorecards Endpoints (with Strict Zod Manual Review Validation)
   // -----------------------------------------------------------
   apiRouter.get('/audits', requireAuth, (req: Request, res: Response) => {
-    const limit = req.query.per_page === 'all' ? 20000 : (parseInt(req.query.per_page as string, 10) || 5000);
+    const limit = req.query.per_page === 'all' ? 20000 : (parseInt(req.query.per_page as string, 10) || 300);
     const audits = sqlite
       .prepare(`
         SELECT a.*,
@@ -7635,11 +7669,16 @@ ${call.transcript || '(No speech transcript recorded)'}
     return res.json({ ok: true, metrics });
   });
 
+  let lastScorecardsReconcileTime = 0;
   apiRouter.get('/scorecards', requireAuth, (req: Request, res: Response) => {
     try {
-      ensureScorecardsForMatchedCalls(sqlite);
+      const forceReconcile = req.query.reconcile === 'true';
+      if (forceReconcile || Date.now() - lastScorecardsReconcileTime > 60000) {
+        lastScorecardsReconcileTime = Date.now();
+        ensureScorecardsForMatchedCalls(sqlite);
+      }
     } catch { }
-    const limit = req.query.per_page === 'all' ? 20000 : (parseInt(req.query.per_page as string, 10) || 5000);
+    const limit = req.query.per_page === 'all' ? 20000 : (parseInt(req.query.per_page as string, 10) || 500);
     const scorecards = sqlite.prepare(`
       SELECT s.* FROM scorecards s
       JOIN calls c ON s.call_id = c.id
@@ -7647,26 +7686,33 @@ ${call.transcript || '(No speech transcript recorded)'}
       ORDER BY s.id DESC LIMIT ?
     `).all(limit) as unknown as ScorecardRecord[];
 
-    const singleTradeStmt = sqlite.prepare('SELECT * FROM trades WHERE id = ?');
-    const matchesStmt = sqlite.prepare('SELECT trade_id FROM matches WHERE call_id = ?');
-    const callStmt = sqlite.prepare('SELECT client, caller_name, dealer, team, calling_number, registered_number, transcript, matched_trade_id FROM calls WHERE id = ?');
+    if (scorecards.length === 0) return res.json([]);
+
+    // Batch load trades and calls in O(1) bulk lookups instead of N+1 individual queries
+    const tradeIds = Array.from(new Set(scorecards.map((s) => s.resolved_trade_id).filter((id): id is number => typeof id === 'number' && id > 0)));
+    const tradesMap = new Map<number, TradeRecord>();
+    if (tradeIds.length > 0) {
+      const placeholders = tradeIds.map(() => '?').join(',');
+      const rows = sqlite.prepare(`SELECT * FROM trades WHERE id IN (${placeholders})`).all(...tradeIds) as unknown as TradeRecord[];
+      rows.forEach((r) => tradesMap.set(r.id, r));
+    }
+
+    const callIds = Array.from(new Set(scorecards.map((s) => s.call_id).filter((id): id is number => typeof id === 'number' && id > 0)));
+    const callsMap = new Map<number, any>();
+    if (callIds.length > 0) {
+      const placeholders = callIds.map(() => '?').join(',');
+      const rows = sqlite.prepare(`SELECT id, client, caller_name, dealer, team, calling_number, registered_number, transcript, matched_trade_id FROM calls WHERE id IN (${placeholders})`).all(...callIds) as any[];
+      rows.forEach((r) => callsMap.set(r.id, r));
+    }
 
     // Attach matched trades, transcript, and authoritative client code for each scorecard
     const enriched = scorecards.map((sc) => {
       let trades: TradeRecord[] = [];
-      if (sc.resolved_trade_id) {
-        const tr = singleTradeStmt.get(sc.resolved_trade_id) as unknown as TradeRecord | undefined;
-        if (tr) trades.push(tr);
-      } else {
-        const matches = matchesStmt.all(sc.call_id) as { trade_id: number }[];
-        if (matches.length > 0) {
-          const tradeIds = matches.map((m) => m.trade_id);
-          const placeholders = tradeIds.map(() => '?').join(',');
-          trades = sqlite.prepare(`SELECT * FROM trades WHERE id IN (${placeholders})`).all(...tradeIds) as unknown as TradeRecord[];
-        }
+      if (sc.resolved_trade_id && tradesMap.has(sc.resolved_trade_id)) {
+        trades.push(tradesMap.get(sc.resolved_trade_id)!);
       }
 
-      const call = callStmt.get(sc.call_id) as any;
+      const call = callsMap.get(sc.call_id);
 
       const matchedTradeId = (sc as any).trade_id || (sc as any).matched_trade_id || call?.matched_trade_id;
       const matchedTrade = (matchedTradeId ? trades.find((t: any) => t.id === matchedTradeId || t.external_id === matchedTradeId) : null)

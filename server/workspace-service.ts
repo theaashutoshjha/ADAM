@@ -1305,6 +1305,23 @@ export function ensureWorkspaceSchema(db: DatabaseSync, workspaceId: string): vo
   ];
   for (const [c, d] of tradeCols) addCol('trades', c, d);
 
+  // Create high-performance database indexes
+  try {
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_calls_call_date ON calls(call_date);
+      CREATE INDEX IF NOT EXISTS idx_calls_status ON calls(status);
+      CREATE INDEX IF NOT EXISTS idx_calls_classification ON calls(classification);
+      CREATE INDEX IF NOT EXISTS idx_calls_client_code ON calls(client_code);
+      CREATE INDEX IF NOT EXISTS idx_scorecards_call_id ON scorecards(call_id);
+      CREATE INDEX IF NOT EXISTS idx_scorecards_client_code ON scorecards(client_code);
+      CREATE INDEX IF NOT EXISTS idx_trades_client ON trades(client);
+      CREATE INDEX IF NOT EXISTS idx_trades_date ON trades(trade_date);
+      CREATE INDEX IF NOT EXISTS idx_matches_call_id ON matches(call_id);
+      CREATE INDEX IF NOT EXISTS idx_matches_trade_id ON matches(trade_id);
+      CREATE INDEX IF NOT EXISTS idx_audits_call_id ON audits(call_id);
+    `);
+  } catch {}
+
   // Initialize starter parameters if empty
   const countRow = db.prepare('SELECT count(*) as c FROM workspace_parameters').get() as { c: number };
   if ((countRow?.c || 0) === 0) {

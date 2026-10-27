@@ -145,11 +145,11 @@ export function App() {
         preOrdersRes,
       ] = await Promise.allSettled([
         api.getStats(),
-        api.getCalls(10000),
-        api.getTrades(10000),
-        api.getMatches(5000),
-        api.getAudits(5000),
-        api.getScorecards(5000),
+        api.getCalls(500),
+        api.getTrades(500),
+        api.getMatches(300),
+        api.getAudits(300),
+        api.getScorecards(300),
         api.getAdvisors(),
         api.getMailHistory(100),
         api.getArchives(),
@@ -250,12 +250,12 @@ export function App() {
       } catch {}
     }, 8000);
 
-    // Full periodic background sync every 45s
+    // Full periodic background sync every 120s
     const fullSyncInterval = setInterval(() => {
       if (!document.hidden && !isFetchingRef.current) {
         fetchAllData();
       }
-    }, 45000);
+    }, 120000);
 
     return () => {
       active = false;

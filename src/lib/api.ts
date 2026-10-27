@@ -144,9 +144,9 @@ export const api = {
 
   // Data endpoints
   getStats: () => apiRequest<PipelineStats>('/api/stats'),
-  getCalls: (perPage = 10000) => apiRequest<CallRecord[]>(`/api/calls?per_page=${perPage}`),
+  getCalls: (perPage = 500) => apiRequest<CallRecord[]>(`/api/calls?per_page=${perPage}`),
   getCall: (id: number) => apiRequest<CallRecord & { segments?: any[]; orders?: any[]; executions?: any[] }>(`/api/calls/${id}`),
-  getTrades: (perPage = 5000) => apiRequest<TradeRecord[]>(`/api/trades?per_page=${perPage}`),
+  getTrades: (perPage = 500) => apiRequest<TradeRecord[]>(`/api/trades?per_page=${perPage}`),
   getPreOrdersSummary: () =>
     apiRequest<{ ok: boolean; summary: TradePreOrdersSummary }>('/api/trades/pre-orders-summary'),
   matchPreOrdersWithCalls: () =>
@@ -157,9 +157,9 @@ export const api = {
     apiRequest<{ ok: boolean; message: string; deletedCount: number }>('/api/trades/delete-all', {
       method: 'POST',
     }),
-  getMatches: (perPage = 5000) => apiRequest<MatchRecord[]>(`/api/matches?per_page=${perPage}`),
-  getAudits: (perPage = 5000) => apiRequest<AuditRecord[]>(`/api/audits?per_page=${perPage}`),
-  getScorecards: (perPage = 5000) => apiRequest<ScorecardRecord[]>(`/api/scorecards?per_page=${perPage}`),
+  getMatches: (perPage = 300) => apiRequest<MatchRecord[]>(`/api/matches?per_page=${perPage}`),
+  getAudits: (perPage = 300) => apiRequest<AuditRecord[]>(`/api/audits?per_page=${perPage}`),
+  getScorecards: (perPage = 300) => apiRequest<ScorecardRecord[]>(`/api/scorecards?per_page=${perPage}`),
   getAdvisors: () => apiRequest<string[]>('/api/scorecards/advisors'),
   getMailHistory: (perPage = 100) => apiRequest<MailHistoryRecord[]>(`/api/mail-history?per_page=${perPage}`),
   getArchives: () => apiRequest<ReportArchive[]>('/api/reports/archives'),
