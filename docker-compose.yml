@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  auditeq:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: auditeq:latest
+    container_name: auditeq-production
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    env_file:
+      - .env
+    volumes:
+      - auditeq_data:/app/.data
+      - ./config:/app/config:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+volumes:
+  auditeq_data:
+    driver: local

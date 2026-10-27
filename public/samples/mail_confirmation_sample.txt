@@ -1,0 +1,8 @@
+Pre-Order Mail Confirmation Archive
+Date: 04-08-2026
+Client ID: WIG42137
+Symbol: DEEPAKFERT-EQ
+Quantity: 3
+Price: 1627.37
+Status: CONFIRMED_VIA_REGISTERED_EMAIL
+Notes: SEBI pre-order written trade confirmation via registered customer email.

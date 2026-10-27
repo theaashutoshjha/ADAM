@@ -1,0 +1,36 @@
+{
+  "_comment": "Advisor Email Directory with To and CC. For 0/5 Fatal Scorecards, sambath.s@fundsindia.com is automatically added to CC for all advisors.",
+  "advisors": [
+    {
+      "name": "Manigandan",
+      "email": "manigandan@fundsindia.com",
+      "cc": ["teamlead.equity@fundsindia.com"],
+      "team": "Equity Advisory"
+    },
+    {
+      "name": "Karthick Raja",
+      "email": "karthick.raja@fundsindia.com",
+      "cc": ["teamlead.equity@fundsindia.com"],
+      "team": "Equity Advisory"
+    },
+    {
+      "name": "Suresh Kumar",
+      "email": "suresh.kumar@fundsindia.com",
+      "cc": ["teamlead.equity@fundsindia.com"],
+      "team": "Wealth Advisory"
+    },
+    {
+      "name": "Praveen",
+      "email": "praveen@fundsindia.com",
+      "cc": ["teamlead.equity@fundsindia.com"],
+      "team": "Derivative Desk"
+    },
+    {
+      "name": "Sowmiya",
+      "email": "sowmiya@fundsindia.com",
+      "cc": ["teamlead.equity@fundsindia.com"],
+      "team": "Commodity Desk"
+    }
+  ],
+  "fatal_default_cc": "sambath.s@fundsindia.com"
+}

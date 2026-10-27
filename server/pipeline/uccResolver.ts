@@ -1,0 +1,338 @@
+// =============================================================
+// ASR-Aware UCC & Number Resolution Engine
+//
+// Core Principle:
+// Whisper/ASR transcription of UCCs, stock names, quantities,
+// and prices cannot be treated as exact text.
+// Example: Real UCC is WIA12345. ASR may produce:
+// WIA12345, WIS 12345, WAI 12345, WIA 12 345, VIA12345, etc.
+//
+// Mandates:
+// 1. ASR output is an observation, not ground truth.
+// 2. Never use loose fuzzy matching that risks identifying the wrong client.
+// 3. Resolve ASR variants using AUTHORITATIVE client data (trades / client master).
+// 4. If multiple client UCCs could match (collision/ambiguity) -> REVIEW.
+// 5. If no authoritative match found -> UNRESOLVED / REVIEW.
+// 6. Never alter the raw transcript text.
+// =============================================================
+
+import type { DatabaseSync } from 'node:sqlite';
+import {
+  normalizeSpokenNumbers,
+  levenshteinDistance,
+  formatCleanClientCode,
+  isStrictValidClientCode,
+  VALID_CLIENT_PREFIXES,
+} from '../normalizer';
+
+export const INVALID_UCC_WORDS = new Set([
+  'OKAY', 'OK', 'YES', 'NO', 'BUY', 'SELL', 'CALL', 'PUT', 'DONE', 'FINE', 
+  'SURE', 'TRUE', 'FALSE', 'NULL', 'NONE', 'TEST', 'CODE', 'USER', 'PASS', 
+  'FAIL', 'HAAN', 'NAHI', 'THEEK', 'BOLO', 'ACCOUNT', 'CLIENT', 'DEALER', 
+  'ADVISOR', 'MARKET', 'SHARES', 'SHARE', 'ORDER', 'RATE', 'PRICE', 'QUANTITY',
+  'LIMIT', 'CMP', 'NUMBER', 'PARTY'
+]);
+
+/**
+ * Validates whether a candidate string is a valid client code (UCC).
+ * User Rule:
+ * "client code can not be random ever
+ * client code always start like this: WIA, WIF, WIC, WID, WIG, WIE, FIA, PWD
+ * Format: 4–6 digits after the prefix. Examples: WIA26779, WIF12345, WIG12345, PWD12345"
+ * Random words or arbitrary non-matching text are strictly rejected.
+ */
+export function isValidUcc(candidate?: string | null): boolean {
+  if (!candidate) return false;
+  const cleaned = formatCleanClientCode(candidate);
+  return isStrictValidClientCode(cleaned);
+}
+
+export interface UccResolutionResult {
+  status: 'RESOLVED' | 'AMBIGUOUS' | 'UNRESOLVED';
+  resolvedUcc: string | null;
+  rawSpokenUcc: string | null;
+  confidence: number;
+  matchingCandidates: string[];
+  notes: string;
+}
+
+// Common phonetic and OCR-like letter confusions observed in Indian financial ASR:
+// W <-> V, S <-> C, B <-> P, M <-> N, D <-> T, C <-> G
+const PREFIX_VARIANTS: Record<string, string[]> = {
+  WIA: ['VIA', 'WAS', 'WAA', 'WAI', 'WIS', 'W1A', 'WYA', 'V.I.A.', 'W.I.A.'],
+  VIA: ['WIA', 'WAS', 'WAA', 'V1A', 'VYA'],
+  WAS: ['WIA', 'VIA', 'WAA'],
+  WAA: ['WIA', 'VIA', 'WAS'],
+  WIS: ['WIA', 'VIA', 'WAI'],
+  WAI: ['WIA', 'VIA', 'WIS'],
+  W1A: ['WIA', 'VIA'],
+  WIG: ['VIG', 'WAG', '4DOUBLEDIGIT', 'DOUBLEDIGIT', 'W1G', 'WIC', 'VIC', 'WTG'],
+  WAG: ['WIG', 'VIG'],
+  WIC: ['WIG', 'VIC', 'VIG', 'W1C'],
+  VIC: ['WIC', 'WIG', 'VIG'],
+  VIG: ['WIG', 'WIC', 'VIC'],
+};
+
+/**
+ * Normalizes raw spoken token into candidate UCC patterns
+ */
+export function generateAsrUccVariants(rawSpoken: string): string[] {
+  if (!rawSpoken) return [];
+
+  const variants = new Set<string>();
+
+  // 1. Direct squashed uppercase
+  const cleaned = rawSpoken.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (cleaned.length >= 3) {
+    variants.add(cleaned);
+  }
+
+  // 2. Normalize spoken numbers ("one two three four five" -> 12345)
+  const numberNormalized = normalizeSpokenNumbers(rawSpoken).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (numberNormalized.length >= 3) {
+    variants.add(numberNormalized);
+  }
+
+  // 3. Handle letter phonetic prefixes (e.g. VIA12345 -> WIA12345)
+  for (const v of Array.from(variants)) {
+    const prefixMatch = v.match(/^([A-Z]{2,4})(\d{3,8})$/);
+    if (prefixMatch) {
+      const prefix = prefixMatch[1];
+      const digits = prefixMatch[2];
+
+      // Check known prefix substitutions
+      const knownSubstitutes = PREFIX_VARIANTS[prefix] || [];
+      for (const sub of knownSubstitutes) {
+        variants.add(`${sub}${digits}`);
+      }
+
+      // If digits has leading zero and length >= 5, also add without leading zero (e.g. 040226 -> 40226)
+      if (digits.startsWith('0') && digits.length >= 5) {
+        const noZero = digits.replace(/^0+/, '');
+        variants.add(`${prefix}${noZero}`);
+        for (const sub of knownSubstitutes) {
+          variants.add(`${sub}${noZero}`);
+        }
+      }
+
+      // V <-> W substitution
+      if (prefix.startsWith('V')) {
+        variants.add(`W${prefix.slice(1)}${digits}`);
+      } else if (prefix.startsWith('W')) {
+        variants.add(`V${prefix.slice(1)}${digits}`);
+      }
+    }
+  }
+
+  return Array.from(variants);
+}
+
+/**
+ * Extracts candidate UCC phrases from transcript using contextual acoustic cues.
+ * Looks for patterns like "account number WIA 12345", "client code 12345", "WIA 45678", etc.
+ */
+export function extractSpokenUccCandidates(transcript: string): Array<{ rawText: string; cleanCandidate: string }> {
+  if (!transcript) return [];
+
+  const candidates: Array<{ rawText: string; cleanCandidate: string }> = [];
+  const normalizedSpoken = normalizeSpokenNumbers(transcript);
+
+  // Pattern 1: Explicit account context + alphanumeric code
+  // e.g., "account number WIA 12345", "client code W I A 6 3 7 2 6", "UCC WIA12345"
+  const contextPatterns = [
+    /\b(?:ucc|client\s+code|client\s+id|account\s+number|account\s+no|a\/c\s+no|client\s+no)\s*(?:is|hai|number|#|:)?\s*([a-zA-Z0-9\s\-._]{3,32})/gi,
+    /\b((?:WIA|WIF|WIC|WID|WIG|WIE|FIA|PWD|PWA|VIA|VIF|VIC|VID|VIG|VIE|WAG)[\s\-._]*(?:\d[\s\-._]*){4,12})\b/gi,
+    /\b((?:W\s+I\s+A|W\s+I\s+F|W\s+I\s+C|W\s+I\s+D|W\s+I\s+G|W\s+I\s+E|F\s+I\s+A|P\s+W\s+D|P\s+W\s+A|P\s+W|W\s+I)[\s\-._]*(?:\d[\s\-._]*){4,12})\b/gi,
+    /\b(double\s+u\s+i\s+[a-z][\s\-._]*(?:\d[\s\-._]*){4,12})\b/gi,
+    /\b((?:(?:(?:4|four)\s*)?double\s*digits?|4DoubleDigit|DoubleDigit)[\s\-._]*(?:is|hai|no|number|:)?[\s\-._]*(?:\d[\s\-._]*){4,12})\b/gi,
+  ];
+
+  for (const pat of contextPatterns) {
+    let match;
+    while ((match = pat.exec(normalizedSpoken)) !== null) {
+      const rawText = match[0];
+      const cleanCandidate = match[1] || match[0];
+      const cleaned = formatCleanClientCode(cleanCandidate);
+      if (cleaned && isStrictValidClientCode(cleaned)) {
+        candidates.push({ rawText, cleanCandidate: cleaned });
+      } else {
+        const squashed = cleanCandidate.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (squashed.length >= 4 && isValidUcc(squashed)) {
+          candidates.push({ rawText, cleanCandidate: squashed });
+        }
+      }
+    }
+  }
+
+  // Also extract bare standard UCC patterns (e.g. WIA12345 or PWD12345) from raw transcript
+  const directUccMatch = transcript.match(/\b((?:WIA|WIF|WIC|WID|WIG|WIE|FIA|PWD|PWA|VIA)[A-Z0-9\s\-._]{2,14})\b/gi);
+  if (directUccMatch) {
+    for (const m of directUccMatch) {
+      const cleaned = formatCleanClientCode(m);
+      if (cleaned && isStrictValidClientCode(cleaned) && !candidates.some((c) => c.cleanCandidate === cleaned)) {
+        candidates.push({ rawText: m, cleanCandidate: cleaned });
+      }
+    }
+  }
+
+  return candidates;
+}
+
+/**
+ * Resolves spoken UCC candidate against the authoritative client directory/trades.
+ *
+ * Algorithm:
+ * 1. Fetch authoritative known client UCCs from trades.
+ * 2. Check if expectedUcc (from metadata/trade) matches candidate via ASR variant rules.
+ * 3. If exact or known ASR variant matches authoritative client -> RESOLVED.
+ * 4. If candidate matches multiple distinct authoritative clients -> AMBIGUOUS (REVIEW).
+ * 5. If no match -> UNRESOLVED.
+ */
+export function resolveUccWithAuthoritativeData(
+  db: DatabaseSync,
+  candidateText: string,
+  expectedUcc?: string | null,
+  callerPhone?: string | null
+): UccResolutionResult {
+  if (!isValidUcc(candidateText)) {
+    return {
+      status: 'UNRESOLVED',
+      resolvedUcc: null,
+      rawSpokenUcc: candidateText,
+      confidence: 0,
+      matchingCandidates: [],
+      notes: `Spoken candidate "${candidateText}" is not a valid UCC format (contains invalid terms or structure).`,
+    };
+  }
+
+  // Get all authoritative distinct UCCs from database
+  let authoritativeUccs: string[] = [];
+  try {
+    const masterRows = db.prepare(`
+      SELECT DISTINCT client_code as client FROM clients WHERE client_code IS NOT NULL AND length(trim(client_code)) > 0
+    `).all() as Array<{ client: string }>;
+    if (masterRows.length > 0) {
+      authoritativeUccs = masterRows.map((r) => r.client.trim().toUpperCase());
+    }
+  } catch {}
+
+  if (authoritativeUccs.length === 0) {
+    try {
+      const rows = db.prepare(`
+        SELECT DISTINCT client FROM trades WHERE client IS NOT NULL AND length(trim(client)) > 0
+        UNION
+        SELECT DISTINCT client_number FROM trades WHERE client_number IS NOT NULL AND length(trim(client_number)) > 0 AND client_number GLOB '*[A-Za-z]*'
+      `).all() as Array<{ client: string }>;
+      authoritativeUccs = rows.map((r) => r.client.trim().toUpperCase());
+    } catch {
+      authoritativeUccs = [];
+    }
+  }
+
+  // If no master or trade records exist, use expectedUcc strictly as sole reference
+  if (authoritativeUccs.length === 0 && expectedUcc) {
+    authoritativeUccs.push(expectedUcc.trim().toUpperCase());
+  }
+
+  if (authoritativeUccs.length === 0) {
+    return {
+      status: 'UNRESOLVED',
+      resolvedUcc: null,
+      rawSpokenUcc: candidateText,
+      confidence: 0,
+      matchingCandidates: [],
+      notes: 'No authoritative client records available in database.',
+    };
+  }
+
+  const variants = generateAsrUccVariants(candidateText);
+  const matchedAuthoritative = new Set<string>();
+
+  for (const authUcc of authoritativeUccs) {
+    const authNorm = authUcc.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const authDigits = authNorm.replace(/\D/g, '');
+    const authPrefix = authNorm.replace(/\d/g, '');
+
+    // 1. Direct match with any ASR variant
+    for (const v of variants) {
+      if (v === authNorm) {
+        matchedAuthoritative.add(authUcc);
+        break;
+      }
+
+      // Check prefix / partial match (e.g. spoken "WIA1234" matches both "WIA12345" and "WIA12346")
+      if (authNorm.startsWith(v) && v.length >= 6) {
+        matchedAuthoritative.add(authUcc);
+        break;
+      }
+
+      // Check prefix substitution + exact numeric suffix
+      const vDigits = v.replace(/\D/g, '');
+      const vPrefix = v.replace(/\d/g, '');
+      if (vDigits === authDigits && authDigits.length >= 3) {
+        // Same digits! Check if prefix is known substitution or 1-edit distance
+        const knownSubs = PREFIX_VARIANTS[vPrefix] || [];
+        if (knownSubs.includes(authPrefix) || levenshteinDistance(vPrefix, authPrefix) <= 1) {
+          matchedAuthoritative.add(authUcc);
+          break;
+        }
+      }
+    }
+  }
+
+  // Disambiguate if callerPhone is available
+  if (matchedAuthoritative.size > 1 && callerPhone) {
+    try {
+      const phoneUccs = db.prepare(`
+        SELECT DISTINCT client FROM trades WHERE phone_number = ? OR client_number = ?
+      `).all(callerPhone, callerPhone) as Array<{ client: string }>;
+      const phoneUccSet = new Set(phoneUccs.map((p) => p.client.toUpperCase()));
+
+      const filtered = Array.from(matchedAuthoritative).filter((ucc) => phoneUccSet.has(ucc));
+      if (filtered.length === 1) {
+        return {
+          status: 'RESOLVED',
+          resolvedUcc: filtered[0],
+          rawSpokenUcc: candidateText,
+          confidence: 0.95,
+          matchingCandidates: filtered,
+          notes: `ASR-resolved "${candidateText}" to authoritative client ${filtered[0]} disambiguated by caller phone ${callerPhone}.`,
+        };
+      }
+    } catch {}
+  }
+
+  const matches = Array.from(matchedAuthoritative);
+
+  if (matches.length === 1) {
+    const formatted = formatCleanClientCode(matches[0]) || matches[0];
+    return {
+      status: 'RESOLVED',
+      resolvedUcc: formatted,
+      rawSpokenUcc: candidateText,
+      confidence: 0.95,
+      matchingCandidates: matches,
+      notes: `ASR-resolved "${candidateText}" to single authoritative client ${formatted}.`,
+    };
+  }
+
+  if (matches.length > 1) {
+    return {
+      status: 'AMBIGUOUS',
+      resolvedUcc: null,
+      rawSpokenUcc: candidateText,
+      confidence: 0.50,
+      matchingCandidates: matches,
+      notes: `Ambiguous ASR UCC: spoken candidate "${candidateText}" matched multiple authoritative clients (${matches.join(', ')}). Routed to REVIEW.`,
+    };
+  }
+
+  return {
+    status: 'UNRESOLVED',
+    resolvedUcc: null,
+    rawSpokenUcc: candidateText,
+    confidence: 0,
+    matchingCandidates: [],
+    notes: `Spoken candidate "${candidateText}" could not be resolved against authoritative client records.`,
+  };
+}

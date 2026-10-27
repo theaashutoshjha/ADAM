@@ -1,0 +1,66 @@
+{
+  "name": "auditeq",
+  "private": true,
+  "version": "17.0.28",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev": "tsx watch server.ts",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "start": "node dist/server.cjs",
+    "preview": "vite preview",
+    "test": "tsx tests/test-auth-and-security.ts && tsx tests/golden-audit-suite.ts && tsx tests/pipeline-accuracy-suite.ts && tsx tests/compliance-strictness-suite.ts && tsx tests/production-specification-suite.ts && tsx tests/deterministic-10-7-5-4-suite.ts && tsx tests/user_logic_verification.ts && tsx tests/test-preorder-gemini-suite.ts && tsx tests/test-transcription-and-client-id.ts && tsx tests/test-deepgram-nova3-suite.ts",
+    "clean": "node -e \"try { fs.rmSync('dist', { recursive: true, force: true }); } catch {}; try { fs.unlinkSync('server.js'); } catch {}\"",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@emailjs/browser": "^4.4.1",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@google/genai": "^2.20.0",
+    "@tailwindcss/vite": "^4.1.14",
+    "@types/adm-zip": "^0.5.8",
+    "@types/multer": "^2.2.0",
+    "@types/pdf-parse": "^1.1.5",
+    "@types/pdfkit": "^0.17.6",
+    "@vitejs/plugin-react": "^5.0.4",
+    "adm-zip": "^0.6.0",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "ffmpeg-static": "^5.3.0",
+    "lucide-react": "^0.546.0",
+    "motion": "^12.23.24",
+    "multer": "^2.3.0",
+    "nodemailer": "^9.0.6",
+    "pdf-parse": "^2.4.5",
+    "pdfkit": "^0.20.2",
+    "pptxgenjs": "^4.0.1",
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1",
+    "vite": "^6.2.3",
+    "xlsx": "^0.18.5",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.14.0",
+    "@types/nodemailer": "^8.0.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "autoprefixer": "^10.4.21",
+    "esbuild": "^0.25.0",
+    "tailwindcss": "^4.1.14",
+    "tsx": "^4.21.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.3"
+  },
+  "overrides": {
+    "image-size": "^2.0.4"
+  },
+  "allowScripts": {
+    "@google/genai": true,
+    "esbuild": true,
+    "protobufjs": true
+  }
+}

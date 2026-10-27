@@ -1,0 +1,857 @@
+@import "tailwindcss";
+
+@layer utilities {
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+  .perspective-1200 {
+    perspective: 1200px;
+  }
+  .transform-style-3d {
+    transform-style: preserve-3d;
+  }
+  .card-3d {
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+  }
+  .card-3d:hover {
+    border-color: rgba(0, 240, 255, 0.4);
+  }
+}
+
+/* ==========================================================================
+   BLACK NEUMORPHISM 3D DESIGN SYSTEM (ADAM-AR OBSIDIAN CONSOLE)
+   ========================================================================== */
+
+/* Pitch Obsidian Dark Root Background */
+body {
+  background-color: #060b18;
+  color: #e2e8f0;
+}
+
+.ambient-mesh-bg {
+  background-color: #060b18;
+  background-image:
+    radial-gradient(at 15% 15%, rgba(0, 240, 255, 0.08) 0px, transparent 40%),
+    radial-gradient(at 50% 18%, rgba(59, 130, 246, 0.12) 0px, transparent 50%),
+    radial-gradient(at 85% 15%, rgba(139, 92, 246, 0.08) 0px, transparent 40%),
+    radial-gradient(at 20% 80%, rgba(16, 185, 129, 0.05) 0px, transparent 45%),
+    radial-gradient(at 80% 85%, rgba(0, 240, 255, 0.06) 0px, transparent 45%);
+  background-attachment: fixed;
+}
+
+/* Extruded 3D Neumorphic Slab */
+.glass-panel,
+.neu-panel {
+  background: linear-gradient(145deg, #101217, #0b0c10);
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-left: 1px solid rgba(255, 255, 255, 0.04);
+  border-right: 1px solid rgba(0, 0, 0, 0.5);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.7);
+  box-shadow: 
+    8px 8px 20px #020304,
+    -5px -5px 12px rgba(255, 255, 255, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.glass-panel-subtle,
+.neu-panel-subtle {
+  background: linear-gradient(145deg, #0d0f13, #090a0d);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-left: 1px solid rgba(255, 255, 255, 0.03);
+  border-right: 1px solid rgba(0, 0, 0, 0.6);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.8);
+  box-shadow: 
+    6px 6px 16px #030405,
+    -4px -4px 10px rgba(255, 255, 255, 0.025);
+}
+
+/* Interactive 3D Neumorphic Card with Elevation on Hover */
+.glass-card-interactive,
+.neu-card-interactive {
+  background: linear-gradient(145deg, #11141a, #0c0e12);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 1px solid rgba(255, 255, 255, 0.04);
+  border-right: 1px solid rgba(0, 0, 0, 0.6);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.8);
+  box-shadow: 
+    7px 7px 18px #020304,
+    -4px -4px 10px rgba(255, 255, 255, 0.03);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-style: preserve-3d;
+}
+
+.glass-card-interactive:hover,
+.neu-card-interactive:hover {
+  transform: perspective(1000px) translateY(-4px) rotateX(1.5deg);
+  border-top-color: rgba(0, 240, 255, 0.3);
+  box-shadow: 
+    14px 18px 36px #010203,
+    -6px -6px 14px rgba(255, 255, 255, 0.05),
+    0 0 20px rgba(0, 240, 255, 0.15);
+}
+
+/* Inset / Recessed Sunken Wells (Debossed Inputs & Trays) */
+.glass-inner,
+.neu-inset {
+  background: #08090d;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  box-shadow: 
+    inset 4px 4px 9px #020304,
+    inset -3px -3px 7px rgba(255, 255, 255, 0.02);
+}
+
+.glass-inner-subtle,
+.neu-inset-subtle {
+  background: #07080b;
+  border: 1px solid rgba(255, 255, 255, 0.02);
+  box-shadow: 
+    inset 3px 3px 6px #020304,
+    inset -2px -2px 5px rgba(255, 255, 255, 0.015);
+}
+
+/* Neumorphic 3D Inputs */
+.glass-input,
+.neu-input {
+  background: #08090d;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  color: #f1f5f9;
+  box-shadow: 
+    inset 4px 4px 8px #020304,
+    inset -2px -2px 6px rgba(255, 255, 255, 0.025);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-input:focus,
+.neu-input:focus {
+  border-color: rgba(0, 240, 255, 0.5);
+  outline: none;
+  box-shadow: 
+    inset 3px 3px 6px #020304,
+    inset -2px -2px 5px rgba(255, 255, 255, 0.03),
+    0 0 14px rgba(0, 240, 255, 0.25);
+}
+
+/* Tactile 3D Neumorphic Buttons */
+.neu-button {
+  background: linear-gradient(145deg, #141720, #0c0e13);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 1px solid rgba(255, 255, 255, 0.04);
+  border-right: 1px solid rgba(0, 0, 0, 0.5);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.7);
+  box-shadow: 
+    5px 5px 12px #020304,
+    -3px -3px 8px rgba(255, 255, 255, 0.03);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+}
+
+.neu-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    8px 8px 18px #010203,
+    -4px -4px 10px rgba(255, 255, 255, 0.045);
+}
+
+.neu-button:active,
+.neu-button-active {
+  background: #090a0e;
+  transform: translateY(1px);
+  box-shadow: 
+    inset 4px 4px 8px #020304,
+    inset -2px -2px 6px rgba(255, 255, 255, 0.025);
+}
+
+/* Neumorphic 3D Pills & Badges */
+.glass-pill,
+.neu-pill {
+  background: linear-gradient(145deg, #11141b, #0b0c10);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 1px solid rgba(255, 255, 255, 0.03);
+  box-shadow: 
+    3px 3px 8px #020304,
+    -2px -2px 5px rgba(255, 255, 255, 0.02);
+}
+
+.glass-pill-active,
+.neu-pill-active {
+  background: linear-gradient(145deg, #00f0ff, #0088cc);
+  color: #020813;
+  font-weight: 700;
+  border-top: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 
+    0 4px 16px rgba(0, 240, 255, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* Glowing 3D Cyber Accents */
+.neu-glow-cyan {
+  box-shadow: 
+    0 0 18px rgba(0, 240, 255, 0.35),
+    inset 0 0 10px rgba(0, 240, 255, 0.15);
+}
+
+.neu-glow-emerald {
+  box-shadow: 
+    0 0 18px rgba(0, 255, 136, 0.35),
+    inset 0 0 10px rgba(0, 255, 136, 0.15);
+}
+
+.neu-glow-amber {
+  box-shadow: 
+    0 0 18px rgba(255, 184, 0, 0.35),
+    inset 0 0 10px rgba(255, 184, 0, 0.15);
+}
+
+.neu-glow-rose {
+  box-shadow: 
+    0 0 18px rgba(255, 51, 102, 0.35),
+    inset 0 0 10px rgba(255, 51, 102, 0.15);
+}
+
+/* Custom Sleek Obsidian Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #06070a;
+  box-shadow: inset 1px 1px 3px #020304;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #1f2430, #131720);
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 2px 2px 5px #020304;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00f0ff;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+}
+
+/* ==========================================================================
+   FUTURISTIC GLOSSY & CYBERNETIC VISUAL ENHANCEMENTS
+   ========================================================================== */
+
+/* Top Gloss Light Sweep Reflection */
+.gloss-overlay {
+  position: relative;
+  overflow: hidden;
+}
+
+.gloss-overlay::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 45%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(255, 255, 255, 0.02) 60%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Cybernetic Neon Glow Borders */
+.cyber-glow-cyan {
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.18), inset 0 0 15px rgba(0, 240, 255, 0.06);
+}
+
+.cyber-glow-emerald {
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.18), inset 0 0 15px rgba(16, 185, 129, 0.06);
+}
+
+.cyber-glow-violet {
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.18), inset 0 0 15px rgba(139, 92, 246, 0.06);
+}
+
+/* Static Audio Waveform Bars */
+.wave-bar-1 { height: 8px; }
+.wave-bar-2 { height: 14px; }
+.wave-bar-3 { height: 10px; }
+.wave-bar-4 { height: 16px; }
+.wave-bar-5 { height: 6px; }
+
+/* Futuristic Glossy Glass Action Button */
+.glossy-btn {
+  position: relative;
+  background: linear-gradient(135deg, rgba(20, 25, 35, 0.95), rgba(10, 12, 18, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 
+    0 4px 14px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glossy-btn:hover {
+  border-color: rgba(0, 240, 255, 0.4);
+  box-shadow: 
+    0 6px 20px rgba(0, 0, 0, 0.6),
+    0 0 15px rgba(0, 240, 255, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.glossy-btn:active {
+  transform: translateY(1px);
+  box-shadow: 
+    inset 0 2px 6px rgba(0, 0, 0, 0.8),
+    inset 0 0 8px rgba(0, 240, 255, 0.2);
+}
+
+/* ==========================================================================
+   ADVANCED FUTURISTIC UI COMPONENTS
+   ========================================================================== */
+
+/* Animated Neon Border Card */
+.neon-border-card {
+  position: relative;
+  border-radius: 1rem;
+  overflow: hidden;
+}
+.neon-border-card::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(0, 240, 255, 0.5) 0%,
+    transparent 40%,
+    transparent 60%,
+    rgba(139, 92, 246, 0.5) 100%
+  );
+  z-index: 0;
+  pointer-events: none;
+}
+.neon-border-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Status Pill Cluster — compact row of status indicators */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.03em;
+  transition: all 0.2s;
+}
+.status-pill-online {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #34d399;
+}
+.status-pill-warning {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+}
+.status-pill-offline {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #f87171;
+}
+.status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: status-pulse 2.5s ease-in-out infinite;
+}
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.85); }
+}
+
+/* Fatal Compliance Card — left accent border */
+.card-fatal-border {
+  border-left: 3px solid rgba(239, 68, 68, 0.85) !important;
+  background: linear-gradient(145deg, #160d0d, #100c0c) !important;
+}
+.card-warning-border {
+  border-left: 3px solid rgba(245, 158, 11, 0.85) !important;
+  background: linear-gradient(145deg, #141005, #0f0d04) !important;
+}
+.card-pass-border {
+  border-left: 3px solid rgba(16, 185, 129, 0.85) !important;
+  background: linear-gradient(145deg, #0d1510, #0a1009) !important;
+}
+
+/* Glowing Progress Bar */
+.progress-bar-glow {
+  position: relative;
+  overflow: visible;
+}
+.progress-bar-glow::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px 2px currentColor;
+}
+
+/* Empty State — holographic scanner */
+.empty-state-scanner {
+  position: relative;
+  overflow: hidden;
+}
+.empty-state-scanner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(0, 240, 255, 0.04) 50%,
+    transparent 100%
+  );
+  animation: scanner-sweep 3s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes scanner-sweep {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+/* Shimmer loading placeholder */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, #0d0f14 25%, #161b22 50%, #0d0f14 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.8s linear infinite;
+}
+
+/* Holographic data grid lines */
+.holo-grid {
+  background-image:
+    linear-gradient(rgba(0, 240, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 240, 255, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* Destructive button style */
+.btn-destructive {
+  background: linear-gradient(135deg, rgba(127, 29, 29, 0.7), rgba(69, 10, 10, 0.9));
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.15), inset 0 1px 0 rgba(255,255,255,0.07);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-destructive:hover {
+  border-color: rgba(239, 68, 68, 0.7);
+  background: linear-gradient(135deg, rgba(153, 27, 27, 0.85), rgba(127, 29, 29, 0.95));
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3), inset 0 1px 0 rgba(255,255,255,0.1);
+  color: #fecaca;
+  transform: translateY(-1px);
+}
+.btn-destructive:active {
+  transform: translateY(0);
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.5);
+}
+
+/* Primary action button */
+.btn-primary-action {
+  background: linear-gradient(135deg, #0e7490, #0369a1);
+  border: 1px solid rgba(6, 182, 212, 0.5);
+  color: white;
+  box-shadow: 0 2px 12px rgba(6, 182, 212, 0.25), inset 0 1px 0 rgba(255,255,255,0.15);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-primary-action:hover {
+  background: linear-gradient(135deg, #0891b2, #0284c7);
+  border-color: rgba(6, 182, 212, 0.8);
+  box-shadow: 0 4px 20px rgba(6, 182, 212, 0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+  transform: translateY(-1px);
+}
+.btn-primary-action:active {
+  transform: translateY(0);
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.4);
+}
+.btn-primary-action:disabled {
+  opacity: 0.5;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Stat card top colored gradient bar */
+.stat-accent-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: 1rem 1rem 0 0;
+}
+
+/* Cybernetic scan line overlay */
+.scanlines {
+  position: relative;
+}
+.scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.08) 2px,
+    rgba(0, 0, 0, 0.08) 4px
+  );
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Compliance severity badge */
+.badge-fatal {
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+  padding: 0.1rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.6rem;
+  font-weight: 800;
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.badge-defect {
+  background: rgba(245, 158, 11, 0.2);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  color: #fbbf24;
+  padding: 0.1rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.6rem;
+  font-weight: 800;
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Metric card pulse ring on hover */
+@keyframes ring-pulse {
+  0% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+.ring-pulse-hover:hover::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  border: 1px solid rgba(0, 240, 255, 0.5);
+  animation: ring-pulse 0.8s ease-out forwards;
+  pointer-events: none;
+}
+
+/* Horizontal stat divider with glow */
+.divider-glow {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.3), transparent);
+}
+
+/* custom-scrollbar alias */
+.custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #152244;
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 240, 255, 0.4);
+}
+
+/* ==========================================================================
+   UNIVERSAL CYBER-HOLOGRAPHIC THEME HARMONIZATION FOR ALL PAGES
+   ========================================================================== */
+
+/* Universal Dark Card Container Harmonization */
+div[class*="bg-[#161B22]"],
+div[class*="bg-[#161b22]"],
+aside[class*="bg-[#161B22]"],
+section[class*="bg-[#161B22]"] {
+  background-color: rgba(9, 17, 38, 0.92) !important;
+  border-color: rgba(0, 240, 255, 0.22) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+div[class*="bg-[#0D1117]"],
+div[class*="bg-[#0d1117]"],
+section[class*="bg-[#0D1117]"] {
+  background-color: rgba(6, 12, 28, 0.95) !important;
+  border-color: rgba(0, 240, 255, 0.18) !important;
+}
+
+/* Universal Border Glow */
+div[class*="border-[#21262D]"],
+div[class*="border-[#21262d]"],
+div[class*="border-[#30363D]"],
+div[class*="border-[#30363d]"],
+table[class*="border-[#21262D]"],
+th[class*="border-[#21262D]"],
+td[class*="border-[#21262D]"] {
+  border-color: rgba(24, 40, 80, 0.8) !important;
+}
+
+/* Universal Hover State for Lists and Rows */
+tr:hover {
+  background-color: rgba(0, 240, 255, 0.03) !important;
+}
+
+button[class*="hover:bg-[#21262D]"]:hover,
+div[class*="hover:bg-[#21262D]"]:hover {
+  background-color: rgba(18, 32, 74, 0.8) !important;
+}
+
+/* Responsive Table & Container Helpers */
+@media (max-width: 768px) {
+  table {
+    font-size: 11px;
+  }
+}
+
+/* ==========================================================================
+   EXACT DASHBOARD VISUAL HARMONIZATION: MATCH EVERY PAGE TO DASHBOARD
+   ========================================================================== */
+
+/* Universal Button Harmonization to Match Dashboard Glowing Blue/Indigo */
+button[class*="from-teal-400"],
+button[class*="from-teal-500"],
+a[class*="from-teal-400"],
+span[class*="from-teal-400"],
+div[class*="from-teal-400"] {
+  background-image: linear-gradient(to right, #2563eb, #4f46e5) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 20px rgba(37, 99, 235, 0.45) !important;
+  border-color: rgba(0, 240, 255, 0.3) !important;
+}
+
+button[class*="from-teal-400"]:hover,
+button[class*="from-teal-500"]:hover {
+  background-image: linear-gradient(to right, #3b82f6, #6366f1) !important;
+  box-shadow: 0 0 25px rgba(37, 99, 235, 0.6) !important;
+}
+
+/* Force text-slate-950 on buttons to pure white */
+button[class*="text-slate-950"],
+span[class*="text-slate-950"] {
+  color: #ffffff !important;
+}
+
+/* Universal Panel Harmonization to Match Dashboard Glass & Cyan Borders */
+.glass-panel,
+.glass-panel-subtle,
+.neu-panel,
+.neu-panel-subtle {
+  background: rgba(9, 17, 38, 0.92) !important;
+  border: 1px solid rgba(0, 240, 255, 0.22) !important;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Universal Inset Wells & Inputs */
+.glass-inner,
+.glass-inner-subtle,
+.neu-inset,
+.neu-inset-subtle,
+.glass-input,
+.neu-input {
+  background: #080f24 !important;
+  border-color: rgba(0, 240, 255, 0.25) !important;
+  color: #f1f5f9 !important;
+}
+
+/* ==========================================================================
+   ADVANCED CYBERNETIC ANIMATIONS & GRAPHICS (BORDER-BEAM, SHIMMER & RADAR)
+   ========================================================================== */
+
+/* 1. Smooth View Enter Transition */
+@keyframes view-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.995);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0px) scale(1);
+  }
+}
+
+.view-enter {
+  animation: view-enter 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* 2. Rotating Border-Beam Card (Linear / Vercel Aesthetic) */
+@keyframes border-beam {
+  0% {
+    offset-distance: 0%;
+  }
+  100% {
+    offset-distance: 100%;
+  }
+}
+
+.border-beam-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.border-beam-container::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from 0deg at 50% 50%,
+    transparent 0deg,
+    transparent 280deg,
+    rgba(0, 240, 255, 0.8) 330deg,
+    rgba(139, 92, 246, 0.9) 360deg
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: spin-beam 6s linear infinite;
+  z-index: 1;
+}
+
+@keyframes spin-beam {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* 3. Concentric Radar Ping */
+@keyframes radar-beacon {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.8);
+    opacity: 0.2;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.radar-beacon {
+  animation: radar-beacon 2.2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+
+/* 4. Shimmer Light Sweep Across Interactive Elements */
+@keyframes shimmer-sweep {
+  0% {
+    transform: translateX(-150%) skewX(-20deg);
+  }
+  100% {
+    transform: translateX(250%) skewX(-20deg);
+  }
+}
+
+.shimmer-sweep-hover {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-sweep-hover::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: translateX(-150%) skewX(-20deg);
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  opacity: 0;
+}
+
+.shimmer-sweep-hover:hover::after {
+  opacity: 1;
+  animation: shimmer-sweep 1s ease-in-out;
+}
+
+/* 5. Holographic Neon Drop-Shadows & Text Accents */
+.text-glow-cyan {
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.6), 0 0 20px rgba(0, 240, 255, 0.25);
+}
+
+.text-glow-purple {
+  text-shadow: 0 0 10px rgba(168, 85, 247, 0.6), 0 0 20px rgba(168, 85, 247, 0.25);
+}
+
+.text-glow-emerald {
+  text-shadow: 0 0 10px rgba(16, 185, 129, 0.6), 0 0 20px rgba(16, 185, 129, 0.25);
+}
+
+/* 6. Static Equalizer Bar Accents (No Animation) */
+.soundwave-bar-1 { height: 60%; }
+.soundwave-bar-2 { height: 40%; }
+.soundwave-bar-3 { height: 80%; }
+.soundwave-bar-4 { height: 50%; }
+
+/* 7. Static Typography and Workspace Badges */
+.text-shimmer {
+  color: #00f0ff;
+}
+
+.workspace-glow-badge {
+  position: relative;
+  border: 1px solid rgba(0, 240, 255, 0.4);
+}
+
+/* 8. Global Zero-Animation Policy (Strict User Instruction) */
+*, *::before, *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  animation-delay: 0ms !important;
+  transition-duration: 0.15s !important;
+}
+
+/* Permit only essential loading spinner */
+.animate-spin {
+  animation: spin-static 1s linear infinite !important;
+  animation-duration: 1s !important;
+  animation-iteration-count: infinite !important;
+}
+
+@keyframes spin-static {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
