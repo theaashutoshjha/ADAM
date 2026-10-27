@@ -1161,10 +1161,13 @@ export function ensureWorkspaceSchema(db: DatabaseSync, workspaceId: string): vo
 
     CREATE TABLE IF NOT EXISTS logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      timestamp TEXT NOT NULL,
       level TEXT NOT NULL,
-      category TEXT NOT NULL,
-      message TEXT NOT NULL
+      event TEXT NOT NULL DEFAULT 'system',
+      message TEXT NOT NULL,
+      context TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      timestamp TEXT,
+      category TEXT
     );
 
     CREATE TABLE IF NOT EXISTS settings (
@@ -1303,7 +1306,15 @@ export function ensureWorkspaceSchema(db: DatabaseSync, workspaceId: string): vo
     ['status', 'TEXT'],
     ['matched_call_id', 'INTEGER'],
   ];
-  for (const [c, d] of tradeCols) addCol('trades', c, d);
+  // Logs columns migration
+  const logCols: [string, string][] = [
+    ['event', 'TEXT DEFAULT "system"'],
+    ['context', 'TEXT'],
+    ['created_at', 'TEXT DEFAULT CURRENT_TIMESTAMP'],
+    ['timestamp', 'TEXT'],
+    ['category', 'TEXT'],
+  ];
+  for (const [c, d] of logCols) addCol('logs', c, d);
 
   // Create high-performance database indexes
   try {

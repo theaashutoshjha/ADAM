@@ -1316,30 +1316,36 @@ function addLog(level: 'info' | 'warning' | 'error' | 'debug', event: string, me
     const sanitizedMsg = redactSensitiveData(String(message)).slice(0, 1000);
     const sanitizedCtx = context ? redactSensitiveData(JSON.stringify(context)) : null;
 
-    if (logsTableHasEvent === null) {
-      try {
-        const info = sqlite.prepare("PRAGMA table_info(logs)").all() as Array<{ name: string }>;
-        logsTableHasEvent = info.some((c) => c.name === 'event');
-        if (!logsTableHasEvent) {
-          sqlite.exec('ALTER TABLE logs ADD COLUMN event TEXT DEFAULT "system";');
-          logsTableHasEvent = true;
-        }
-      } catch {
-        logsTableHasEvent = false;
-      }
-    }
-
-    if (logsTableHasEvent) {
+    try {
       sqlite
         .prepare('INSERT INTO logs (level, event, message, context, created_at) VALUES (?, ?, ?, ?, ?)')
-        .run(level, event, sanitizedMsg, sanitizedCtx, now);
-    } else {
-      sqlite
-        .prepare('INSERT INTO logs (level, message, context, created_at) VALUES (?, ?, ?, ?)')
-        .run(level, sanitizedMsg, sanitizedCtx, now);
+        .run(level, event || 'system', sanitizedMsg, sanitizedCtx, now);
+      return;
+    } catch (insertErr: any) {
+      const errStr = String(insertErr);
+      if (errStr.includes('no column named event') || errStr.includes('no column named context') || errStr.includes('no column named created_at')) {
+        try { sqlite.exec('ALTER TABLE logs ADD COLUMN event TEXT DEFAULT "system";'); } catch {}
+        try { sqlite.exec('ALTER TABLE logs ADD COLUMN context TEXT;'); } catch {}
+        try { sqlite.exec('ALTER TABLE logs ADD COLUMN created_at TEXT;'); } catch {}
+        sqlite
+          .prepare('INSERT INTO logs (level, event, message, context, created_at) VALUES (?, ?, ?, ?, ?)')
+          .run(level, event || 'system', sanitizedMsg, sanitizedCtx, now);
+        return;
+      }
+      // If table has old schema (timestamp, category)
+      try {
+        sqlite
+          .prepare('INSERT INTO logs (timestamp, level, category, message) VALUES (?, ?, ?, ?)')
+          .run(now, level, event || 'system', sanitizedMsg);
+        return;
+      } catch {}
+      throw insertErr;
     }
   } catch (err) {
-    console.error('Failed to write log:', err);
+    // Fail silently or debug log without crashing application
+    if (process.env.DEBUG_LOGS) {
+      console.warn('Failed to write log:', err);
+    }
   }
 }
 
