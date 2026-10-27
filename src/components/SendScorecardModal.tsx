@@ -21,7 +21,7 @@ import {
   FATAL_CC_EMAIL,
 } from '../lib/fundsindia-directory';
 import { cleanCallerName } from '../lib/clientCode';
-import { api, getStoredToken } from '../lib/api';
+import { api, getStoredToken, getApiUrl, safeParseJsonResponse } from '../lib/api';
 
 interface SendScorecardModalProps {
   isOpen: boolean;
@@ -143,7 +143,8 @@ export const SendScorecardModal: React.FC<SendScorecardModalProps> = ({
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const res = await fetch('/api/scorecards/send-all-to-advisors', {
+      const url = getApiUrl('/api/scorecards/send-all-to-advisors');
+      const res = await fetch(url, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -156,7 +157,7 @@ export const SendScorecardModal: React.FC<SendScorecardModalProps> = ({
         }),
       });
 
-      const data = await res.json();
+      const data = await safeParseJsonResponse<any>(res);
       if (!res.ok) throw new Error(data.error || 'Failed to dispatch scorecards');
 
       setStatusMessage({

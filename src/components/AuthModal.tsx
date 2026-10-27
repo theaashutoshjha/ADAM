@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, Mail, Key, CheckCircle2, AlertCircle, X, Sparkles, Shield } from 'lucide-react';
 import type { UserProfile } from '../types';
-import { setStoredToken } from '../lib/api';
+import { setStoredToken, getApiUrl, safeParseJsonResponse } from '../lib/api';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -38,13 +38,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setLoading(true);
 
     try {
-      const resp = await fetch('/api/auth/login', {
+      const url = getApiUrl('/api/auth/login');
+      const resp = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: username.trim(), password: password.trim() }),
       });
 
-      const data = await resp.json();
+      const data = await safeParseJsonResponse<any>(resp);
       if (!resp.ok || !data.ok) {
         throw new Error(data.error || 'Authentication failed.');
       }

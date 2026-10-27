@@ -30,7 +30,7 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import type { ScorecardRecord } from '../types';
-import { api, getStoredToken } from '../lib/api';
+import { api, getStoredToken, getApiUrl, safeParseJsonResponse } from '../lib/api';
 import { cleanCallerName } from '../lib/clientCode';
 import { findAdvisorEntry } from '../lib/fundsindia-directory';
 import { TranscriptHighlighter } from './TranscriptHighlighter';
@@ -160,12 +160,13 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const res = await fetch('/api/master-grid/upload', {
+      const url = getApiUrl('/api/master-grid/upload');
+      const res = await fetch(url, {
         method: 'POST',
         headers,
         body: formData,
       });
-      const data = await res.json();
+      const data = await safeParseJsonResponse<any>(res);
       if (!res.ok) {
         throw new Error(data.error || 'Failed to upload master grid');
       }

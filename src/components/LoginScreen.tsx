@@ -15,10 +15,21 @@ import {
   TrendingUp,
   Crown,
   ChevronDown,
+  Server,
+  CheckCircle2,
+  RefreshCw,
+  Settings2,
 } from 'lucide-react';
 import type { UserProfile } from '../types';
 import { AdamLogo } from './AdamLogo';
-import { setStoredToken, setStoredWorkspace } from '../lib/api';
+import {
+  setStoredToken,
+  setStoredWorkspace,
+  getApiUrl,
+  safeParseJsonResponse,
+  getApiBaseUrl,
+  setApiBaseUrl,
+} from '../lib/api';
 
 interface LoginScreenProps {
   onLoginSuccess: (user: UserProfile, token: string) => void;
@@ -197,6 +208,33 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onBack
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const [showServerConfig, setShowServerConfig] = useState(false);
+  const [serverUrlInput, setServerUrlInput] = useState(() => getApiBaseUrl());
+  const [serverStatusMsg, setServerStatusMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [isTestingServer, setIsTestingServer] = useState(false);
+
+  const handleTestAndSaveServer = async () => {
+    setIsTestingServer(true);
+    setServerStatusMsg(null);
+    try {
+      const targetBase = serverUrlInput.trim().replace(/\/+$/, '');
+      const testUrl = targetBase ? `${targetBase}/api/health` : '/api/health';
+      const res = await fetch(testUrl);
+      const data = await safeParseJsonResponse<any>(res);
+      if (res.ok && (data.status === 'ok' || data.version)) {
+        setApiBaseUrl(targetBase);
+        setServerStatusMsg({ text: `Connected successfully to backend v${data.version || ''}!`, ok: true });
+        setErrorMessage(null);
+      } else {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+    } catch (err: any) {
+      setServerStatusMsg({ text: `Connection failed: ${err?.message || 'Server unreachable'}`, ok: false });
+    } finally {
+      setIsTestingServer(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -222,17 +260,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onBack
         headers['X-AuditEQ-Workspace'] = selectedWorkspace;
       }
 
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          username: cleanUser,
-          password: cleanPass,
-          workspace_id: selectedWorkspace !== 'auto' ? selectedWorkspace : undefined,
-        }),
-      });
+      const loginUrl = getApiUrl('/api/auth/login');
+      let res: Response;
+      try {
+        res = await fetch(loginUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            username: cleanUser,
+            password: cleanPass,
+            workspace_id: selectedWorkspace !== 'auto' ? selectedWorkspace : undefined,
+          }),
+        });
+      } catch (netErr: any) {
+        throw new Error(
+          `Unable to reach backend server at ${loginUrl}. If running frontend on Cloudflare Pages, configure your Backend Server URL below.`
+        );
+      }
 
-      const data = await res.json();
+      const data = await safeParseJsonResponse<any>(res);
 
       if (!res.ok || !data.ok || !data.authenticated) {
         throw new Error(data.error || 'Authentication failed. Please verify your Login ID and Password.');
@@ -286,9 +332,28 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onBack
 
         {/* Error Alert */}
         {errorMessage && (
-          <div className="mb-6 p-3 rounded-xl bg-red-950/70 border border-red-500/50 text-red-200 text-xs flex items-center gap-2">
-            <AlertCircle size={15} className="text-red-400 shrink-0" />
-            <span>{errorMessage}</span>
+          <div className="mb-6 p-4 rounded-xl bg-red-950/70 border border-red-500/50 text-red-200 text-xs flex flex-col gap-2">
+            <div className="flex items-start gap-2.5">
+              <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
+              <div className="flex-1 leading-relaxed">{errorMessage}</div>
+            </div>
+            {(errorMessage.includes('Cloudflare') ||
+              errorMessage.includes('Backend') ||
+              errorMessage.includes('404') ||
+              errorMessage.includes('502') ||
+              errorMessage.includes('521') ||
+              errorMessage.includes('unreachable') ||
+              errorMessage.includes('reach') ||
+              errorMessage.includes('connect')) && (
+              <button
+                type="button"
+                onClick={() => setShowServerConfig(true)}
+                className="self-start text-[11px] font-mono text-cyan-400 hover:text-cyan-300 underline cursor-pointer mt-0.5 flex items-center gap-1"
+              >
+                <Server size={12} />
+                <span>Configure Backend Server URL &rarr;</span>
+              </button>
+            )}
           </div>
         )}
 
@@ -386,8 +451,57 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onBack
           </button>
         </form>
 
+        {/* Cloudflare Pages / Remote Backend Host Configuration */}
+        <div className="mt-6 pt-4 border-t border-[#162344]">
+          <button
+            type="button"
+            onClick={() => setShowServerConfig(!showServerConfig)}
+            className="w-full flex items-center justify-between text-xs text-gray-400 hover:text-cyan-300 transition-colors py-1 cursor-pointer"
+          >
+            <span className="flex items-center gap-1.5 font-mono text-[11px]">
+              <Server size={13} className="text-cyan-400" />
+              API Host: {serverUrlInput ? serverUrlInput : '(Same Origin / Local)'}
+            </span>
+            <span className="text-[11px] text-cyan-400/90 font-mono underline">
+              {showServerConfig ? 'Close' : 'Configure Server'}
+            </span>
+          </button>
+
+          {showServerConfig && (
+            <div className="mt-3 p-3.5 bg-[#070e22] border border-[#1a2c56] rounded-xl text-xs space-y-2.5">
+              <div className="text-[11px] text-gray-400 leading-relaxed">
+                Deploying on Cloudflare Pages? Specify your active Node.js server URL (e.g. <span className="text-cyan-300">https://api.yourdomain.com</span> or leave empty for same origin):
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="https://api.yourdomain.com (or empty for default)"
+                  value={serverUrlInput}
+                  onChange={(e) => setServerUrlInput(e.target.value)}
+                  className="flex-1 px-3 py-1.5 bg-[#0a1128] border border-[#1e3260] rounded-lg text-xs text-white focus:outline-none focus:border-cyan-400 font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={handleTestAndSaveServer}
+                  disabled={isTestingServer}
+                  className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1 shrink-0 disabled:opacity-50 cursor-pointer"
+                >
+                  {isTestingServer ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                  <span>Save & Test</span>
+                </button>
+              </div>
+              {serverStatusMsg && (
+                <div className={`text-[11px] flex items-center gap-1.5 ${serverStatusMsg.ok ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {serverStatusMsg.ok ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
+                  <span>{serverStatusMsg.text}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Footer Security Notice */}
-        <div className="mt-8 pt-4 border-t border-[#162344] text-center">
+        <div className="mt-4 pt-3 border-t border-[#162344] text-center">
           <p className="text-[11px] text-gray-500">
             Authorized institutional access only. Personal isolated database & dedicated cryptographic storage active.
           </p>

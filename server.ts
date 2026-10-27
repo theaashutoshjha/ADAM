@@ -3274,7 +3274,7 @@ function clearLoginAttempts(identifier: string, ip: string) {
 // -------------------------------------------------------------
 async function startServer() {
   const app = express();
-  app.set('trust proxy', 1); // Trust first reverse proxy hop (Nginx)
+  app.set('trust proxy', true); // Trust reverse proxies (Cloudflare, Nginx, Docker)
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -3285,12 +3285,12 @@ async function startServer() {
     res.setHeader('X-XSS-Protection', '1; mode=block');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
     res.setHeader(
       'Content-Security-Policy',
-      "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://api.groq.com https://generativelanguage.googleapis.com; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self';"
+      "default-src 'self' https: data: blob: 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss: ws: https://api.groq.com https://generativelanguage.googleapis.com; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self';"
     );
 
     // Disable caching on sensitive API and administrative routes
@@ -3300,18 +3300,20 @@ async function startServer() {
       res.setHeader('Expires', '0');
     }
 
-    // CORS Origin check
+    // CORS Origin check - Fully compatible with Cloudflare Pages, Workers, Tunnels, and Custom Domains
     const origin = req.headers.origin;
     if (origin) {
       const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map((o) => o.trim()).filter(Boolean);
-      const isLocalhost = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
-      if (isLocalhost || allowedOrigins.includes(origin)) {
+      const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+      const isCloudflare = /\.pages\.dev$|\.workers\.dev$|\.cloudflare\.com$/i.test(origin);
+      const isAllowed = allowedOrigins.length === 0 || allowedOrigins.includes('*') || isLocalhost || isCloudflare || allowedOrigins.includes(origin);
+
+      if (isAllowed) {
         res.setHeader('Access-Control-Allow-Origin', origin);
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-AuditEQ-Token, X-AuditEQ-Database, X-AuditEQ-Workspace');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-AuditEQ-Token, X-AuditEQ-Database, X-AuditEQ-Workspace, X-Session-Id, X-Customer-Number, X-Stream-Final');
         res.setHeader('Access-Control-Allow-Credentials', 'true');
-      } else if (req.method === 'OPTIONS') {
-        return res.status(403).end();
+        res.setHeader('Access-Control-Max-Age', '86400');
       }
     }
 
@@ -3682,7 +3684,7 @@ async function startServer() {
     const { username, password } = parseResult.data;
     const cleanIdentifier = String(username || '').trim().toLowerCase();
     const rawPassword = String(password || '');
-    const clientIp = String(req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown');
+    const clientIp = String(req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.ip || req.socket?.remoteAddress || 'unknown');
 
     // Server-side boundary checks
     if (cleanIdentifier.length < 3 || cleanIdentifier.length > 100 || rawPassword.length < 1 || rawPassword.length > 128) {

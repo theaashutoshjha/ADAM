@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type { AuditRecord, CallRecord } from '../types';
-import { api } from '../lib/api';
+import { api, getApiUrl, safeParseJsonResponse } from '../lib/api';
 import { TranscriptHighlighter } from './TranscriptHighlighter';
 
 interface AuditViewProps {
@@ -216,7 +216,8 @@ export const AuditView: React.FC<AuditViewProps> = ({
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/calls/bulk-audit', {
+      const url = getApiUrl('/api/calls/bulk-audit');
+      const res = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -225,7 +226,7 @@ export const AuditView: React.FC<AuditViewProps> = ({
         body: JSON.stringify({ call_ids: ids }),
       });
 
-      const json = await res.json();
+      const json = await safeParseJsonResponse<any>(res);
       if (json.ok) {
         alert(`Bulk audit complete: ${json.audited} audited successfully, ${json.blocked} blocked by compliance gates, ${json.failed} errors.`);
         window.location.reload();

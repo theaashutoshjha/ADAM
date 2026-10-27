@@ -32,7 +32,7 @@ const AdminView = lazy(() => import('./components/AdminView').then((m) => ({ def
 const ReleaseReadinessView = lazy(() => import('./components/ReleaseReadinessView').then((m) => ({ default: m.ReleaseReadinessView })));
 const IngestionWorkspace = lazy(() => import('./components/IngestionWorkspace').then((m) => ({ default: m.IngestionWorkspace })));
 const WorkspaceParametersView = lazy(() => import('./components/WorkspaceParametersView').then((m) => ({ default: m.WorkspaceParametersView })));
-import { api, clearStoredToken, getStoredToken, setStoredToken, setStoredWorkspace } from './lib/api';
+import { api, clearStoredToken, getStoredToken, setStoredToken, setStoredWorkspace, getApiUrl, safeParseJsonResponse } from './lib/api';
 
 import type {
   ActiveTab,
@@ -641,11 +641,12 @@ export function App() {
             const token = getStoredToken();
             const headers: Record<string, string> = { 'Content-Type': 'application/json' };
             if (token) headers['Authorization'] = `Bearer ${token}`;
-            const res = await fetch('/api/scorecards/send-all-to-advisors', {
+            const url = getApiUrl('/api/scorecards/send-all-to-advisors');
+            const res = await fetch(url, {
               method: 'POST',
               headers,
             });
-            const data = await res.json();
+            const data = await safeParseJsonResponse<any>(res);
             if (!res.ok) throw new Error(data.error || 'Failed to dispatch scorecards');
             showToast(data.message || `Dispatched ${data.dispatched || 0} advisor emails.`);
             await fetchAllData();

@@ -63,6 +63,74 @@ export function setStoredWorkspace(wsId: string) {
   localStorage.setItem(ACTIVE_DB_KEY, wsId);
 }
 
+export function getApiBaseUrl(): string {
+  // 1. Explicit environment variable set at build or runtime
+  const envUrl = (import.meta as any).env?.VITE_API_URL || (import.meta as any).env?.VITE_BACKEND_URL;
+  if (envUrl && typeof envUrl === 'string' && envUrl.trim()) {
+    return envUrl.trim().replace(/\/+$/, '');
+  }
+  // 2. Window global if injected by Cloudflare HTML / server
+  if (typeof window !== 'undefined' && (window as any).__ADAM_API_URL__) {
+    return String((window as any).__ADAM_API_URL__).trim().replace(/\/+$/, '');
+  }
+  // 3. User configured backend host in localStorage
+  if (typeof window !== 'undefined') {
+    const custom = localStorage.getItem('adam_api_url') || localStorage.getItem('auditeq_api_url');
+    if (custom && custom.trim()) {
+      return custom.trim().replace(/\/+$/, '');
+    }
+  }
+  // 4. Default to same origin (relative)
+  return '';
+}
+
+export function setApiBaseUrl(url: string) {
+  if (typeof window !== 'undefined') {
+    const clean = url.trim().replace(/\/+$/, '');
+    if (clean) {
+      localStorage.setItem('adam_api_url', clean);
+    } else {
+      localStorage.removeItem('adam_api_url');
+      localStorage.removeItem('auditeq_api_url');
+    }
+  }
+}
+
+export function getApiUrl(endpoint: string): string {
+  const base = getApiBaseUrl();
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  return base ? `${base}${cleanEndpoint}` : cleanEndpoint;
+}
+
+export async function safeParseJsonResponse<T = any>(response: Response): Promise<T> {
+  const text = await response.text();
+
+  if (!text || text.trim().length === 0) {
+    if (!response.ok) {
+      throw new Error(`Server returned HTTP ${response.status} (${response.statusText || 'Empty Response'}). Backend server may be offline or unreachable.`);
+    }
+    return {} as T;
+  }
+
+  // Check if response is HTML (e.g. Cloudflare error page, 404, or SPA fallback index.html)
+  const trimmed = text.trim();
+  if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html') || trimmed.startsWith('<head')) {
+    if (response.status === 404) {
+      throw new Error(`Backend API endpoint not found (HTTP 404). If deploying frontend on Cloudflare Pages, please set your Backend Server URL.`);
+    }
+    if (response.status === 502 || response.status === 521 || response.status === 522 || response.status === 524) {
+      throw new Error(`Cloudflare Gateway Error (HTTP ${response.status}): The backend Node.js server is offline or unreachable.`);
+    }
+    throw new Error(`Server returned HTML instead of JSON (HTTP ${response.status}). The requested API route may not be responding.`);
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(`Invalid JSON response from server (HTTP ${response.status}): ${text.slice(0, 150)}`);
+  }
+}
+
 export async function apiRequest<T = any>(
   endpoint: string,
   options: RequestInit = {}
@@ -84,35 +152,30 @@ export async function apiRequest<T = any>(
     headers.set('X-AuditEQ-Database', activeDb);
   }
 
-  const response = await fetch(endpoint, {
-    ...options,
-    headers,
-  });
+  const url = getApiUrl(endpoint);
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (netErr: any) {
+    throw new Error(`Network Error: Unable to connect to ${url}. ${netErr?.message || 'Check your internet connection or backend server status.'}`);
+  }
+
+  const data = await safeParseJsonResponse<any>(response);
 
   if (response.status === 401) {
-    const errorData = await response.json().catch(() => ({ error: 'Unauthorized' }));
-    const error = new Error(errorData.error || 'Authentication required');
+    const error = new Error(data.error || 'Authentication required');
     (error as any).status = 401;
     throw error;
   }
 
   if (!response.ok) {
-    const errorText = await response.text();
-    let errorMessage = `HTTP ${response.status}`;
-    try {
-      const parsed = JSON.parse(errorText);
-      errorMessage = parsed.error || parsed.message || errorMessage;
-    } catch {
-      errorMessage = errorText.slice(0, 300) || errorMessage;
-    }
-    throw new Error(errorMessage);
+    throw new Error(data.error || data.message || `HTTP ${response.status}`);
   }
 
-  const contentType = response.headers.get('content-type');
-  if (contentType && contentType.includes('application/json')) {
-    return response.json();
-  }
-  return response.text() as unknown as T;
+  return data as T;
 }
 
 export const api = {

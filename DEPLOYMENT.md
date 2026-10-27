@@ -134,3 +134,34 @@ sqlite3 /var/data/auditeq/auditeq_production.db ".backup /var/backups/auditeq/au
 gzip /var/backups/auditeq/auditeq_backup_${DATE}.db
 find /var/backups/auditeq/ -type f -name "*.db.gz" -mtime +30 -delete
 ```
+
+---
+
+## 6. Cloudflare Deployment Guide
+
+### Architecture Options
+
+#### Option A: Cloudflare Tunnel (Full-Stack Node.js Server — Recommended)
+Run the Node.js server (`node dist/server.cjs`) on your server/VPS and expose it securely via Cloudflare Tunnel without opening ports:
+```bash
+# 1. Install cloudflared
+curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+dpkg -i cloudflared.deb
+
+# 2. Authenticate & create tunnel
+cloudflared tunnel login
+cloudflared tunnel create adam-tunnel
+
+# 3. Route domain to local server port 3000
+cloudflared tunnel route dns adam-tunnel compliance.brokerage.com
+
+# 4. Run tunnel
+cloudflared tunnel run --url http://localhost:3000 adam-tunnel
+```
+
+#### Option B: Cloudflare Pages (Frontend) + External Node Backend
+If you deploy the frontend build (`dist/`) directly to Cloudflare Pages:
+1. In Cloudflare Pages Dashboard, navigate to **Settings > Environment variables**.
+2. Add variable `BACKEND_URL` pointing to your deployed Node.js backend (e.g. `https://api.yourdomain.com`).
+3. The built-in Cloudflare Pages Function (`functions/api/[[catchall]].ts`) will automatically proxy all `/api/*` calls to your backend server.
+4. Alternatively, click **"Configure Server"** directly on the Login Screen to specify the backend host URL at any time.

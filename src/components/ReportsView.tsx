@@ -36,7 +36,7 @@ import {
 import * as XLSX from 'xlsx';
 import pptxgen from 'pptxgenjs';
 import type { ReportArchive, ScorecardRecord, CallRecord } from '../types';
-import { getStoredToken } from '../lib/api';
+import { getStoredToken, getApiUrl, safeParseJsonResponse } from '../lib/api';
 import { useAudioPlayer } from './GlobalAudioPlayer';
 import { cleanCallerName } from '../lib/clientCode';
 
@@ -134,11 +134,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     setIsFetchingAnalytics(true);
     try {
       const token = getStoredToken();
-      const res = await fetch('/api/reports/analytics', {
+      const url = getApiUrl('/api/reports/analytics');
+      const res = await fetch(url, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeParseJsonResponse<any>(res);
         setAnalytics(data);
       }
     } catch (err) {

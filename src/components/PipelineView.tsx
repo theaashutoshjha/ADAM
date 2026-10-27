@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import type { PipelineStats } from '../types';
 import { IngestionWorkspace } from './IngestionWorkspace';
+import { getApiUrl, safeParseJsonResponse } from '../lib/api';
 
 interface PipelineViewProps {
   stats: PipelineStats | null;
@@ -126,11 +127,21 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
 
   const fetchPipelineData = useCallback(async () => {
     try {
+      const fetchJson = async (path: string) => {
+        try {
+          const res = await fetch(getApiUrl(path));
+          if (!res.ok) return null;
+          return await safeParseJsonResponse<any>(res);
+        } catch {
+          return null;
+        }
+      };
+
       const [workerRes, metricsRes, reconRes, funnelRes] = await Promise.all([
-        fetch('/api/pipeline/worker-status').then((r) => (r.ok ? r.json() : null)),
-        fetch('/api/pipeline/accuracy-metrics').then((r) => (r.ok ? r.json() : null)),
-        fetch('/api/pipeline/reconciliation').then((r) => (r.ok ? r.json() : null)),
-        fetch('/api/pipeline/funnel-metrics').then((r) => (r.ok ? r.json() : null)),
+        fetchJson('/api/pipeline/worker-status'),
+        fetchJson('/api/pipeline/accuracy-metrics'),
+        fetchJson('/api/pipeline/reconciliation'),
+        fetchJson('/api/pipeline/funnel-metrics'),
       ]);
 
       if (workerRes?.status) setWorkerStatus(workerRes.status);
