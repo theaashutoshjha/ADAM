@@ -1,6 +1,5 @@
 // ==============================================================================
-// Cloudflare Pages / Workers Advanced Mode Worker
-// Serves static assets with SPA routing and proxies /api/* to the Node.js backend
+// Cloudflare Worker: API Reverse Proxy & Static Asset Handler
 // ==============================================================================
 
 export default {

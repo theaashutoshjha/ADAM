@@ -1,0 +1,5 @@
+# Exclude server-side scripts and maps from static asset bucket
+_worker.js
+server.cjs
+server.cjs.map
+.assetsignore
