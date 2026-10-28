@@ -23,6 +23,7 @@ import type { AuditEligibilityResult } from './types';
 import type { CallRecord } from '../../src/types';
 import { isValidUcc } from './uccResolver';
 import { isIndianMarketHours, isStrictValidClientCode } from '../normalizer';
+import { currentWorkspaceIdStorage } from '../workspace-service';
 
 export function isAuditEligible(
   db: DatabaseSync,
@@ -41,6 +42,28 @@ export function isAuditEligible(
       eligible: false,
       gateCode: 'CALL_NOT_FOUND',
       reason: 'Call record could not be found in the database.',
+    };
+  }
+
+  // Non-preorder desks: purely call audio & quality parameters audit (no trade confirmation needed)
+  const activeWs = currentWorkspaceIdStorage.getStore() || 'preorder_desk';
+  if (activeWs !== 'preorder_desk') {
+    const hasAudioOrTranscript = Boolean(
+      (call.transcript && call.transcript.trim().length > 0) ||
+      call.storage_path ||
+      call.recording_name
+    );
+    if (!hasAudioOrTranscript) {
+      return {
+        eligible: false,
+        gateCode: 'NO_AUDIO_OR_TRANSCRIPT',
+        reason: 'Call recording or transcript is required for quality audit.',
+      };
+    }
+    return {
+      eligible: true,
+      gateCode: 'QUALITY_AUDIT_ELIGIBLE',
+      reason: 'Call audio / transcript ready for workspace quality audit.',
     };
   }
 

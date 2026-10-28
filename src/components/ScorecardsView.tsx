@@ -23,7 +23,8 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type { ScorecardRecord } from '../types';
-import { api, getStoredToken } from '../lib/api';
+import { api, getStoredToken, getStoredWorkspace } from '../lib/api';
+import { getOfficialParametersForWorkspace, getScorecardHeaderTitle } from '../lib/workspace-parameters-def';
 import { cleanCallerName } from '../lib/clientCode';
 import { findAdvisorEntry } from '../lib/fundsindia-directory';
 import { TranscriptHighlighter } from './TranscriptHighlighter';
@@ -720,172 +721,342 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
                 id={`scorecard-print-${sc.id}`}
                 className="glass-panel p-5 sm:p-6 rounded-2xl max-w-4xl mx-auto space-y-4 font-sans border border-teal-500/20 transition-all hover:border-teal-500/40"
               >
-                {/* Official Card Header Title */}
-                <div className="bg-gradient-to-r from-teal-700 via-teal-600 to-cyan-700 text-white font-bold text-center py-2.5 px-4 rounded-t-xl text-sm sm:text-base tracking-wide uppercase shadow-sm">
-                  Offline Pre Order Confirmation Call Audit Score Card
-                </div>
+                {(() => {
+                  const activeWs = getStoredWorkspace() || 'preorder_desk';
+                  const isPreorder = activeWs === 'preorder_desk' || (!activeWs && (!sc.team || sc.team.includes('Pre-order')));
+                  const officialCategories = !isPreorder ? getOfficialParametersForWorkspace(activeWs) : [];
+                  const title = getScorecardHeaderTitle(activeWs);
 
-                {/* Metadata 2x4 Table */}
-                <table className="w-full border-collapse border border-slate-700 text-xs">
-                  <tbody>
-                    <tr>
-                      <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300 w-1/4">
-                        Caller Name
-                      </th>
-                      <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 text-white font-medium w-1/4">
-                        {cleanCallerName(sc.caller_name) || '—'}
-                      </td>
-                      <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300 w-1/4">
-                        Team
-                      </th>
-                      <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 text-white font-medium w-1/4">
-                        {sc.team || '—'}
-                      </td>
-                    </tr>
-                    <tr>
-                      <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300">
-                        Client ID
-                      </th>
-                      <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 font-mono font-bold text-teal-300">
-                        {sc.client || '—'}
-                      </td>
-                      <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300">
-                        Phone Number
-                      </th>
-                      <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 font-mono text-white">
-                        {sc.trade_phone || sc.calling_number || '—'}
-                      </td>
-                    </tr>
-                    <tr>
-                      <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300">
-                        Trade Date
-                      </th>
-                      <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 text-white">
-                        {sc.trade_date || sc.call_date || '—'}
-                      </td>
-                      <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300">
-                        Audit Date
-                      </th>
-                      <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 text-white">
-                        {sc.created_at?.slice(0, 10) || new Date().toISOString().slice(0, 10)}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                  const calculatedScore = isFatal 
+                    ? 0 
+                    : (typeof sc.score === 'number' ? Math.min(5, Math.max(0, sc.score)) : 5);
+                  const displayStars = isFatal ? '*' : '*'.repeat(Math.max(1, Math.min(5, calculatedScore)));
 
-                {/* 5-Mark Compliance Scorecard Table */}
-                <table className="w-full border-collapse border border-slate-700 text-xs">
-                  <thead className="bg-slate-950 text-teal-300 font-bold text-center border-b border-teal-500/20">
-                    <tr>
-                      <th className="border border-slate-700 p-2.5 text-left w-3/5">PARAMETERS</th>
-                      <th className="border border-slate-700 p-2.5 w-16">Mark</th>
-                      <th className="border border-slate-700 p-2.5 w-20">Flag</th>
-                      <th className="border border-slate-700 p-2.5 w-24">Score</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(() => {
-                      const isQ3ResolvedPass = sc.q3_status === 'PASS';
+                  if (isPreorder || officialCategories.length === 0) {
+                    return (
+                      <>
+                        {/* Official Card Header Title */}
+                        <div className="bg-gradient-to-r from-teal-700 via-teal-600 to-cyan-700 text-white font-bold text-center py-2.5 px-4 rounded-t-xl text-sm sm:text-base tracking-wide uppercase shadow-sm">
+                          {title}
+                        </div>
 
-                      const rows = [
-                        {
-                          id: 'Q1',
-                          q: "Confirmation given in the Customer's Registered / authorised Number ?",
-                          ans: sc.q1_status,
-                          evidence: sc.q1_evidence,
-                          fatal: true,
-                        },
-                        {
-                          id: 'Q2',
-                          q: 'Pre Order Confirmation is as per the Regulatory Norms?',
-                          ans: sc.q2_status,
-                          evidence: sc.q2_evidence || (sc.q2_status === 'PASS' ? 'Pre-order confirmation call was placed prior to trade execution.' : 'Pre-order confirmation timing violation.'),
-                          fatal: true,
-                        },
-                        {
-                          id: 'Q3',
-                          q: 'Were stock name, price and quantity explicitly confirmed before the order?',
-                          ans: isQ3ResolvedPass ? 'PASS' : sc.q3_status,
-                          evidence: sc.q3_evidence,
-                          fatal: false,
-                        },
-                        {
-                          id: 'Q4',
-                          q: 'Customer Acknowledge the same?',
-                          ans: sc.q4_status || 'PASS',
-                          evidence: sc.q4_evidence || 'Customer acknowledged order execution details.',
-                          fatal: false,
-                        },
-                        {
-                          id: 'Q5',
-                          q: "Wasn't there any Return Commitment ? (Fatal)",
-                          ans: sc.q5_status,
-                          evidence: sc.q5_evidence,
-                          fatal: true,
-                        },
-                      ];
+                        {/* Metadata 2x4 Table */}
+                        <table className="w-full border-collapse border border-slate-700 text-xs">
+                          <tbody>
+                            <tr>
+                              <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300 w-1/4">
+                                Caller Name
+                              </th>
+                              <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 text-white font-medium w-1/4">
+                                {cleanCallerName(sc.caller_name) || '—'}
+                              </td>
+                              <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300 w-1/4">
+                                Team
+                              </th>
+                              <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 text-white font-medium w-1/4">
+                                {sc.team || '—'}
+                              </td>
+                            </tr>
+                            <tr>
+                              <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300">
+                                Client ID
+                              </th>
+                              <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 font-mono font-bold text-teal-300">
+                                {sc.client || '—'}
+                              </td>
+                              <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300">
+                                Phone Number
+                              </th>
+                              <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 font-mono text-white">
+                                {sc.trade_phone || sc.calling_number || '—'}
+                              </td>
+                            </tr>
+                            <tr>
+                              <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300">
+                                Trade Date
+                              </th>
+                              <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 text-white">
+                                {sc.trade_date || sc.call_date || '—'}
+                              </td>
+                              <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300">
+                                Audit Date
+                              </th>
+                              <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 text-white">
+                                {sc.created_at?.slice(0, 10) || new Date().toISOString().slice(0, 10)}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
 
-                      const calculatedScore = isFatal 
-                        ? 0 
-                        : (typeof sc.score === 'number' ? Math.min(5, Math.max(0, sc.score)) : 5);
-                      const displayStars = isFatal ? '*' : '*'.repeat(Math.max(1, Math.min(5, calculatedScore)));
+                        {/* 5-Mark Compliance Scorecard Table */}
+                        <table className="w-full border-collapse border border-slate-700 text-xs">
+                          <thead className="bg-slate-950 text-teal-300 font-bold text-center border-b border-teal-500/20">
+                            <tr>
+                              <th className="border border-slate-700 p-2.5 text-left w-3/5">PARAMETERS</th>
+                              <th className="border border-slate-700 p-2.5 w-16">Mark</th>
+                              <th className="border border-slate-700 p-2.5 w-20">Flag</th>
+                              <th className="border border-slate-700 p-2.5 w-24">Score</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(() => {
+                              const isQ3ResolvedPass = sc.q3_status === 'PASS';
 
-                      return (
-                        <>
-                          {rows.map((p) => {
-                            const isPass = p.ans === 'PASS' || p.ans === 'pass';
+                              const rows = [
+                                {
+                                  id: 'Q1',
+                                  q: "Confirmation given in the Customer's Registered / authorised Number ?",
+                                  ans: sc.q1_status,
+                                  evidence: sc.q1_evidence,
+                                  fatal: true,
+                                },
+                                {
+                                  id: 'Q2',
+                                  q: 'Pre Order Confirmation is as per the Regulatory Norms?',
+                                  ans: sc.q2_status,
+                                  evidence: sc.q2_evidence || (sc.q2_status === 'PASS' ? 'Pre-order confirmation call was placed prior to trade execution.' : 'Pre-order confirmation timing violation.'),
+                                  fatal: true,
+                                },
+                                {
+                                  id: 'Q3',
+                                  q: 'Were stock name, price and quantity explicitly confirmed before the order?',
+                                  ans: isQ3ResolvedPass ? 'PASS' : sc.q3_status,
+                                  evidence: sc.q3_evidence,
+                                  fatal: false,
+                                },
+                                {
+                                  id: 'Q4',
+                                  q: 'Customer Acknowledge the same?',
+                                  ans: sc.q4_status || 'PASS',
+                                  evidence: sc.q4_evidence || 'Customer acknowledged order execution details.',
+                                  fatal: false,
+                                },
+                                {
+                                  id: 'Q5',
+                                  q: "Wasn't there any Return Commitment ? (Fatal)",
+                                  ans: sc.q5_status,
+                                  evidence: sc.q5_evidence,
+                                  fatal: true,
+                                },
+                              ];
+
+                              return (
+                                <>
+                                  {rows.map((p) => {
+                                    const isPass = p.ans === 'PASS' || p.ans === 'pass';
+                                    return (
+                                      <tr key={p.id} className="hover:bg-teal-500/5 transition-colors">
+                                        <td className={`border border-slate-700 px-3 py-2 ${p.fatal ? 'text-rose-400 font-medium' : 'text-slate-200'}`}>
+                                          <div>{p.q}</div>
+                                          {p.evidence && (
+                                            <div className="text-[11px] text-slate-400 italic mt-0.5">
+                                              Evidence: "{p.evidence}"
+                                            </div>
+                                          )}
+                                        </td>
+                                        <td className="border border-slate-700 px-3 py-2 text-center font-mono font-bold text-white">
+                                          {isPass ? '1' : '0'}
+                                        </td>
+                                        <td className={`border border-slate-700 px-3 py-2 text-center font-bold ${p.fatal ? 'text-rose-400' : ''}`}>
+                                          {p.fatal ? 'FATAL' : ''}
+                                        </td>
+                                        <td className="border border-slate-700 px-3 py-2 text-center font-bold text-white">
+                                          {isPass ? 'Yes' : 'No'}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+
+                                  {/* Total Row */}
+                                  <tr className="bg-teal-950/60 font-bold text-white border-t border-teal-500/30">
+                                    <td className="border border-slate-700 px-3 py-2 text-right text-teal-300">TOTAL</td>
+                                    <td className="border border-slate-700 px-3 py-2 text-center font-mono text-sm text-teal-300">5</td>
+                                    <td className="border border-slate-700 px-3 py-2 text-center font-mono text-base text-amber-300">
+                                      {displayStars}
+                                    </td>
+                                    <td className="border border-slate-700 px-3 py-2 text-center font-mono text-base text-teal-300">
+                                      {calculatedScore}
+                                    </td>
+                                  </tr>
+                                </>
+                              );
+                            })()}
+                          </tbody>
+                        </table>
+
+                        {/* Comment Box */}
+                        <div className="border border-slate-700 bg-slate-900/60 p-3.5 rounded-b-xl text-xs leading-relaxed flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div>
+                            <b className="text-teal-300 mr-2">Comment about call:</b>
+                            <span className="text-slate-200">
+                              {sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory Norm.'}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-400 font-medium shrink-0 print:hidden">
+                            ADAM-AR v1.1
+                          </div>
+                        </div>
+                      </>
+                    );
+                  }
+
+                  // Non-preorder Desks: Images 2, 3, 4 Scorecards
+                  return (
+                    <>
+                      {/* Official Card Header Title */}
+                      <div className="bg-gradient-to-r from-teal-800 via-slate-800 to-teal-800 text-white font-bold text-center py-2.5 px-4 rounded-t-xl text-sm sm:text-base tracking-wide uppercase shadow-sm border border-slate-700">
+                        {title}
+                      </div>
+
+                      {/* Metadata Table matching Image 2, 3, 4 */}
+                      <table className="w-full border-collapse border border-slate-700 text-xs">
+                        <tbody>
+                          <tr>
+                            <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300 w-1/4">
+                              Agent Name
+                            </th>
+                            <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 text-white font-medium w-1/4">
+                              {cleanCallerName(sc.caller_name) || 'Coach'}
+                            </td>
+                            <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300 w-1/4">
+                              Call Date
+                            </th>
+                            <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 text-white font-medium w-1/4">
+                              {sc.call_date || sc.trade_date || '—'}
+                            </td>
+                          </tr>
+                          <tr>
+                            <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300">
+                              L1 Manager
+                            </th>
+                            <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 text-white">
+                              Other Team
+                            </td>
+                            <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300">
+                              Audit Date
+                            </th>
+                            <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 text-white">
+                              {sc.created_at?.slice(0, 10) || new Date().toISOString().slice(0, 10)}
+                            </td>
+                          </tr>
+                          <tr>
+                            <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300">
+                              No of Calls
+                            </th>
+                            <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 text-white">
+                              1
+                            </td>
+                            <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300">
+                              Customer Name
+                            </th>
+                            <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 font-mono font-bold text-teal-300">
+                              {sc.client || 'Investor'}
+                            </td>
+                          </tr>
+                          <tr>
+                            <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300">
+                              Call Scenario
+                            </th>
+                            <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 text-white">
+                              {sc.team || 'Quality Audit'}
+                            </td>
+                            <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300">
+                              Phone Number
+                            </th>
+                            <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 font-mono text-white">
+                              {sc.calling_number || sc.trade_phone || '—'}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+
+                      {/* Quality Scorecard Table with grouped categories matching Images 2, 3, 4 */}
+                      <table className="w-full border-collapse border border-slate-700 text-xs">
+                        <tbody>
+                          {officialCategories.map((cat, catIdx) => {
+                            const catKey = `q${catIdx + 1}_status` as keyof ScorecardRecord;
+                            const isCatPass = (sc[catKey] as string) !== 'FAIL';
                             return (
-                              <tr key={p.id} className="hover:bg-teal-500/5 transition-colors">
-                                <td className={`border border-slate-700 px-3 py-2 ${p.fatal ? 'text-rose-400 font-medium' : 'text-slate-200'}`}>
-                                  <div>{p.q}</div>
-                                  {p.evidence && (
-                                    <div className="text-[11px] text-slate-400 italic mt-0.5">
-                                      Evidence: "{p.evidence}"
-                                    </div>
-                                  )}
-                                </td>
-                                <td className="border border-slate-700 px-3 py-2 text-center font-mono font-bold text-white">
-                                  {isPass ? '1' : '0'}
-                                </td>
-                                <td className={`border border-slate-700 px-3 py-2 text-center font-bold ${p.fatal ? 'text-rose-400' : ''}`}>
-                                  {p.fatal ? 'FATAL' : ''}
-                                </td>
-                                <td className="border border-slate-700 px-3 py-2 text-center font-bold text-white">
-                                  {isPass ? 'Yes' : 'No'}
-                                </td>
-                              </tr>
+                              <React.Fragment key={cat.param_key}>
+                                {cat.subparameters.map((sub, subIdx) => {
+                                  return (
+                                    <tr key={sub.id} className="hover:bg-slate-800/40 transition-colors">
+                                      {subIdx === 0 && (
+                                        <td
+                                          rowSpan={cat.subparameters.length}
+                                          className={`border border-slate-700 p-3 font-bold align-middle text-center w-1/4 ${
+                                            cat.fatal ? 'text-rose-400 font-extrabold' : 'text-slate-100'
+                                          }`}
+                                        >
+                                          <div>{cat.title}</div>
+                                          {cat.fatal && (
+                                            <div className="text-rose-500 text-[10px] uppercase font-bold tracking-wider mt-0.5">
+                                              FATAL
+                                            </div>
+                                          )}
+                                        </td>
+                                      )}
+                                      <td className={`border border-slate-700 px-3 py-2 ${cat.fatal ? 'text-rose-300/90' : 'text-slate-200'}`}>
+                                        {sub.title}
+                                      </td>
+                                      {subIdx === 0 && (
+                                        <td
+                                          rowSpan={cat.subparameters.length}
+                                          className="border border-slate-700 p-2 text-center font-bold text-white align-middle w-16"
+                                        >
+                                          {cat.weight}
+                                        </td>
+                                      )}
+                                      {subIdx === 0 && (
+                                        <td
+                                          rowSpan={cat.subparameters.length}
+                                          className={`border border-slate-700 p-2 text-center font-bold align-middle w-20 ${
+                                            isCatPass ? 'text-emerald-400' : 'text-rose-400'
+                                          }`}
+                                        >
+                                          {isCatPass ? 'Yes' : 'No'}
+                                        </td>
+                                      )}
+                                    </tr>
+                                  );
+                                })}
+                              </React.Fragment>
                             );
                           })}
 
-                          {/* Total Row */}
-                          <tr className="bg-teal-950/60 font-bold text-white border-t border-teal-500/30">
-                            <td className="border border-slate-700 px-3 py-2 text-right text-teal-300">TOTAL</td>
-                            <td className="border border-slate-700 px-3 py-2 text-center font-mono text-sm text-teal-300">5</td>
-                            <td className="border border-slate-700 px-3 py-2 text-center font-mono text-base text-amber-300">
-                              {displayStars}
+                          {/* Score & Star Rating Total Row - matching green banner in images */}
+                          <tr className="bg-emerald-900/80 border border-slate-700 text-white font-bold text-sm">
+                            <td colSpan={2} className="border border-slate-700 px-4 py-2.5 text-center tracking-wide uppercase font-extrabold">
+                              Score & Star Rating
                             </td>
-                            <td className="border border-slate-700 px-3 py-2 text-center font-mono text-base text-teal-300">
+                            <td className="border border-slate-700 p-2 text-center font-mono text-base font-extrabold">
                               {calculatedScore}
                             </td>
+                            <td className="border border-slate-700 p-2 text-center font-mono text-base font-extrabold text-amber-300">
+                              {displayStars}
+                            </td>
                           </tr>
-                        </>
-                      );
-                    })()}
-                  </tbody>
-                </table>
+                        </tbody>
+                      </table>
 
-                {/* Comment Box */}
-                <div className="border border-slate-700 bg-slate-900/60 p-3.5 rounded-b-xl text-xs leading-relaxed flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <b className="text-teal-300 mr-2">Comment about call:</b>
-                    <span className="text-slate-200">
-                      {sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory Norm.'}
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-slate-400 font-medium shrink-0 print:hidden">
-                    ADAM-AR v1.1
-                  </div>
-                </div>
+                      {/* Overall Feedback */}
+                      <div className="border border-slate-700 bg-slate-900/80 p-3.5 rounded-lg text-xs leading-relaxed">
+                        <div className="font-bold text-slate-100 mb-1">Overall Feedback</div>
+                        <div className="text-slate-300 min-h-[32px]">
+                          {sc.audit_comment || 'Call audited successfully against quality standards and communication guidelines.'}
+                        </div>
+                      </div>
+
+                      {/* FATAL Reason */}
+                      <div className="border border-slate-700 bg-slate-900/80 p-3.5 rounded-b-xl text-xs leading-relaxed">
+                        <div className="font-bold text-rose-500 mb-1">FATAL Reason</div>
+                        <div className={`min-h-[24px] ${isFatal ? 'text-rose-300 font-semibold' : 'text-slate-400'}`}>
+                          {isFatal ? (sc.fatal_reasons || 'Breach of Critical Compliance Parameters.') : 'None'}
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
 
                 {/* Card Action Controls */}
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-1 print:hidden">

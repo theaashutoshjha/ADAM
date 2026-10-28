@@ -129,6 +129,7 @@ import {
   resetWorkspaceParameters,
 } from './server/workspace-service';
 import { seedPreorderWorkspaceData } from './server/preorder-seed';
+import { auditCallForWorkspace } from './server/workspace-quality-evaluator';
 
 // Top-level crash protection: Distinguish transient socket/stream errors from fatal memory corruptions
 process.on('unhandledRejection', (reason) => {
@@ -3006,6 +3007,15 @@ async function claimAndProcessNextJob(): Promise<boolean> {
         return true;
       }
 
+      const activeWs = currentWorkspaceIdStorage.getStore() || 'preorder_desk';
+      if (activeWs !== 'preorder_desk') {
+        const qualityResult = auditCallForWorkspace(sqlite, call.id, activeWs);
+        sqlite.prepare("UPDATE calls SET pipeline_stage = 'completed', pipeline_status = 'completed', score = ?, updated_at = ? WHERE id = ?").run(qualityResult.score, now, call.id);
+        sqlite.prepare("UPDATE jobs SET status = 'completed', locked_at = NULL, locked_by = NULL, updated_at = ? WHERE id = ?").run(now, job.id);
+        setSettingValue('pipeline_stage', 'idle');
+        return true;
+      }
+
       // Resolve authoritative trade context without array fallbacks
       const { resolvedTrade, candidateTrades, clientCode } = resolveAuthoritativeContextForCall(call.id);
 
@@ -3712,10 +3722,21 @@ async function startServer() {
       });
     }
 
-    // Look up user strictly in primarySqlite
-    const user = primarySqlite
-      .prepare('SELECT id, username, email, full_name, password_hash, salt, role, workspace_id FROM users WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?) LIMIT 1')
-      .get(cleanIdentifier, cleanIdentifier) as {
+    // Validate target workspace if client explicitly specified one
+    const requestedWorkspace = (
+      (req.headers['x-auditeq-workspace'] as string) ||
+      (req.body as any)?.workspace_id ||
+      ''
+    ).trim();
+
+    // Look up candidate users matching cleanIdentifier across workspaces
+    let candidateUsers = primarySqlite
+      .prepare(`
+        SELECT id, username, email, full_name, password_hash, salt, role, workspace_id
+        FROM users
+        WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?) OR LOWER(username) LIKE LOWER(?)
+      `)
+      .all(cleanIdentifier, cleanIdentifier, `${cleanIdentifier}#%`) as Array<{
         id: number;
         username: string;
         email: string | null;
@@ -3724,36 +3745,43 @@ async function startServer() {
         salt: string;
         role: string;
         workspace_id?: string;
-      } | undefined;
+      }>;
 
-    // Timing-safe dummy salt and hash to thwart user enumeration timing attacks
-    const dummySalt = '0123456789abcdef0123456789abcdef';
-    const dummyHash = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+    // If client requested a specific desk, prioritize matching that workspace
+    if (requestedWorkspace && requestedWorkspace !== 'auto') {
+      const workspaceSpecificCandidates = candidateUsers.filter(
+        (u) => u.workspace_id === requestedWorkspace
+      );
+      if (workspaceSpecificCandidates.length > 0) {
+        candidateUsers = workspaceSpecificCandidates;
+      }
+    }
 
-    const targetSalt = user?.salt || dummySalt;
-    const targetHash = user?.password_hash || dummyHash;
+    let user: typeof candidateUsers[0] | undefined;
+    for (const cand of candidateUsers) {
+      if (verifyPassword(rawPassword, cand.salt, cand.password_hash)) {
+        user = cand;
+        break;
+      }
+    }
 
-    // Cryptographic hash verification - strictly encrypted, no plaintext checks!
-    const isPasswordValid = Boolean(user && verifyPassword(rawPassword, targetSalt, targetHash));
-
-    if (!user || !isPasswordValid) {
+    if (!user) {
       recordFailedLoginAttempt(cleanIdentifier, clientIp);
-      // Small artificial delay to slow down automated bot dictionary / brute-force attacks
+      // Small artificial delay to thwart automated dictionary / brute-force attacks
       await new Promise((resolve) => setTimeout(resolve, 500));
       return res.status(401).json({ ok: false, error: 'Invalid credentials. Please verify your email and password.' });
     }
 
-    // Validate target workspace if client explicitly specified one
-    const requestedWorkspace = (
-      (req.headers['x-auditeq-workspace'] as string) ||
-      (req.body as any)?.workspace_id ||
-      ''
-    ).trim();
-
     const wsId = user.workspace_id || 'preorder_desk';
     const wsDef = getWorkspaceById(wsId) || WORKSPACES[0];
 
-    if (requestedWorkspace && requestedWorkspace !== 'auto' && requestedWorkspace !== wsId) {
+    // Administrators can access any workspace; standard quality users must access their designated desk
+    if (
+      user.role !== 'admin' &&
+      requestedWorkspace &&
+      requestedWorkspace !== 'auto' &&
+      requestedWorkspace !== wsId
+    ) {
       const targetWsDef = getWorkspaceById(requestedWorkspace);
       addLog('warning', 'AUTH_WORKSPACE_MISMATCH', `User "${user.username}" attempted access to "${targetWsDef?.name || requestedWorkspace}" with credentials for "${wsDef.name}". Access blocked.`);
       return res.status(403).json({
@@ -5884,6 +5912,25 @@ ${call.transcript || '(No speech transcript recorded)'}
     if (!call) return res.status(404).json({ ok: false, error: 'Call not found.' });
 
     try {
+      const activeWs = (req as any).currentWorkspaceId || currentWorkspaceIdStorage.getStore() || 'preorder_desk';
+      if (activeWs !== 'preorder_desk') {
+        const qualityResult = auditCallForWorkspace(sqlite, callId, activeWs);
+        const audit = sqlite.prepare('SELECT * FROM audits WHERE call_id = ? ORDER BY id DESC LIMIT 1').get(callId);
+        const scorecard = sqlite.prepare('SELECT * FROM scorecards WHERE call_id = ? ORDER BY id DESC LIMIT 1').get(callId);
+        addLog('info', 'FORCE_AUDIT_SUCCESS', `Call #${callId} audited via Quality Evaluator for workspace "${activeWs}". Score: ${qualityResult.score}/5.`);
+        return res.json({
+          ok: true,
+          audit,
+          scorecard,
+          scoreResult: {
+            score: qualityResult.score,
+            maxScore: 5,
+            is_fatal: qualityResult.is_fatal,
+            fatal_reasons: qualityResult.fatal_reasons,
+          },
+        });
+      }
+
       // MANDATORY STAGE 6 GATEKEEPER CHECK:
       const eligibility = isAuditEligible(sqlite, callId);
       if (!eligibility.eligible) {
@@ -5920,6 +5967,39 @@ ${call.transcript || '(No speech transcript recorded)'}
 
     const uniqueIds = Array.from(new Set(call_ids.map(Number))).filter((id) => !isNaN(id) && id > 0);
     const results: Array<{ call_id: number; success: boolean; status?: string; score?: number; error?: string }> = [];
+
+    const activeWs = (req as any).currentWorkspaceId || currentWorkspaceIdStorage.getStore() || 'preorder_desk';
+    if (activeWs !== 'preorder_desk') {
+      for (const callId of uniqueIds) {
+        try {
+          const qRes = auditCallForWorkspace(sqlite, callId, activeWs);
+          results.push({
+            call_id: callId,
+            success: true,
+            status: qRes.is_fatal ? 'FAIL' : 'PASS',
+            score: qRes.score,
+          });
+        } catch (err: any) {
+          results.push({
+            call_id: callId,
+            success: false,
+            status: 'ERROR',
+            error: err.message,
+          });
+        }
+      }
+      const audited = results.filter((r) => r.success).length;
+      const failed = results.filter((r) => !r.success).length;
+      addLog('info', 'BULK_AUDIT_COMPLETE', `Bulk quality audit completed for ${uniqueIds.length} calls: ${audited} audited, ${failed} failed.`);
+      return res.json({
+        ok: true,
+        total: uniqueIds.length,
+        audited,
+        blocked: 0,
+        failed,
+        results,
+      });
+    }
 
     // Bounded concurrent execution (5 concurrent workers)
     const CONCURRENCY = 5;

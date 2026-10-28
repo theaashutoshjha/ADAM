@@ -166,20 +166,20 @@ async function handleCloudflareEdgeApi(request: Request, url: URL): Promise<Resp
   // 4. Pipeline Stats
   if (path === '/pipeline/stats' || path === '/stats') {
     return json({
-      total_calls: 314,
-      pre_order_calls: 142,
-      regular_calls: 98,
-      scrap_calls: 74,
-      processed_calls: 314,
-      matched_trades: 86,
-      fatal_breaches: 4,
-      compliance_rate: 96.8,
+      total_calls: 1177,
+      pre_order_calls: 1177,
+      regular_calls: 0,
+      scrap_calls: 0,
+      processed_calls: 1177,
+      matched_trades: 1182,
+      fatal_breaches: 42,
+      compliance_rate: 96.4,
       average_score: 4.8,
-      calls: 314,
-      trades: 182,
-      matched: 86,
-      audited: 142,
-      scored: 142,
+      calls: 1177,
+      trades: 1182,
+      matched: 1194,
+      audited: 1177,
+      scored: 1177,
       running: false,
     });
   }
@@ -396,19 +396,21 @@ async function handleCloudflareEdgeApi(request: Request, url: URL): Promise<Resp
 function getWorkspaceName(id: string): string {
   const map: Record<string, string> = {
     preorder_desk: 'Pre-order Regulatory Desk',
-    equity_advisory: 'Equity Advisory QA',
-    hni_desk: 'HNI Relationship Desk',
-    algo_desk: 'Algo & Derivatives QA',
-    customer_support: 'Customer support',
+    customer_support: 'Customer Support',
     mf_gold: 'MF Gold',
     mf_silver: 'MF Silver',
     mf_digital: 'MF Digital',
     mf_onboarding: 'MF Onboarding',
+    equity_onboarding: 'Equity Onboarding',
+    equity_regular: 'Equity Regular',
+    mf_platinum: 'MF Platinum',
+    compliance_admin: 'Global Compliance Administrator',
   };
   return map[id] || 'Pre-order Regulatory Desk';
 }
 
 function getWorkspaceCategory(id: string): string {
+  if (id === 'compliance_admin') return 'System Admin';
   if (id.startsWith('mf_')) return 'Mutual Fund';
   if (id === 'customer_support') return 'Support';
   return 'Equity';
@@ -416,14 +418,15 @@ function getWorkspaceCategory(id: string): string {
 
 const EDGE_WORKSPACES = [
   { id: 'preorder_desk', name: 'Pre-order Regulatory Desk', category: 'Equity', db: 'auditeq_production.db' },
-  { id: 'equity_advisory', name: 'Equity Advisory QA', category: 'Equity', db: 'equity_advisory.db' },
-  { id: 'hni_desk', name: 'HNI Relationship Desk', category: 'Equity', db: 'hni_desk.db' },
-  { id: 'algo_desk', name: 'Algo & Derivatives QA', category: 'Equity', db: 'algo_desk.db' },
-  { id: 'customer_support', name: 'Customer support', category: 'Support', db: 'customer_support.db' },
+  { id: 'customer_support', name: 'Customer Support', category: 'Support', db: 'customer_support.db' },
   { id: 'mf_gold', name: 'MF Gold', category: 'Mutual Fund', db: 'mf_gold.db' },
   { id: 'mf_silver', name: 'MF Silver', category: 'Mutual Fund', db: 'mf_silver.db' },
   { id: 'mf_digital', name: 'MF Digital', category: 'Mutual Fund', db: 'mf_digital.db' },
   { id: 'mf_onboarding', name: 'MF Onboarding', category: 'Mutual Fund', db: 'mf_onboarding.db' },
+  { id: 'equity_onboarding', name: 'Equity Onboarding', category: 'Equity', db: 'equity_onboarding.db' },
+  { id: 'equity_regular', name: 'Equity Regular', category: 'Equity', db: 'equity_regular.db' },
+  { id: 'mf_platinum', name: 'MF Platinum', category: 'Mutual Fund', db: 'mf_platinum.db' },
+  { id: 'compliance_admin', name: 'Global Compliance Administrator', category: 'System Admin', db: 'auditeq_production.db' },
 ];
 
 const EDGE_CALLS = [

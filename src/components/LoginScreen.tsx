@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   RefreshCw,
   Settings2,
+  ShieldCheck,
 } from 'lucide-react';
 import type { UserProfile } from '../types';
 import { AdamLogo } from './AdamLogo';
@@ -39,7 +40,7 @@ interface LoginScreenProps {
 export interface WorkspaceAccount {
   id: string;
   name: string;
-  category: 'Equity' | 'Mutual Fund' | 'Support';
+  category: 'Equity' | 'Mutual Fund' | 'Support' | 'System Admin';
   db: string;
   tagline: string;
   icon: React.ComponentType<{ className?: string; size?: number }>;
@@ -196,6 +197,22 @@ export const WORKSPACE_ACCOUNTS: WorkspaceAccount[] = [
       glow: 'shadow-none',
       text: 'text-purple-300',
       pill: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
+    },
+  },
+  {
+    id: 'compliance_admin',
+    name: 'Global Compliance Administrator',
+    category: 'System Admin',
+    db: 'Multi-DB / Switchable',
+    tagline: 'Enterprise Super-Admin & Cross-Desk Compliance Oversight',
+    icon: ShieldCheck,
+    theme: {
+      accent: 'from-amber-400 to-rose-500',
+      border: 'border-rose-500/40',
+      bg: 'bg-rose-500/10',
+      glow: 'shadow-none',
+      text: 'text-rose-300',
+      pill: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
     },
   },
 ];

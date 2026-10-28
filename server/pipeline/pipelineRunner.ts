@@ -23,6 +23,8 @@ import { isAuditEligible } from './eligibility';
 import { stage7AuditCall } from './audit';
 import { stage8CalculateScore } from './scoring';
 import { stage9PublishAudit, stage9ReconcileMissingCalls } from './reconciliation';
+import { currentWorkspaceIdStorage } from '../workspace-service';
+import { auditCallForWorkspace } from '../workspace-quality-evaluator';
 import type { CallRecord } from '../../src/types';
 import type { ClassificationResult } from './types';
 import { detectHighRecallPreOrderCandidate } from '../classifier';
@@ -720,8 +722,32 @@ export async function runFullPipelineForCall(
     `).run(now, callId);
 
     // ---------------------------------------------------------
-    // STAGE 7: Q1/Q2/Q3/Q4 COMPLIANCE AUDIT
+    // STAGE 7: COMPLIANCE / QUALITY AUDIT
     // ---------------------------------------------------------
+    const activeWs = currentWorkspaceIdStorage.getStore() || 'preorder_desk';
+    if (activeWs !== 'preorder_desk') {
+      console.log(`[Pipeline] Call #${callId} -> Quality Audit for workspace "${activeWs}"`);
+      const qualityResult = auditCallForWorkspace(db, callId, activeWs);
+      db.prepare(`
+        UPDATE calls SET
+          pipeline_stage = 'COMPLETED',
+          pipeline_status = 'SUCCESS',
+          audit_status = 'AUDITED',
+          status = 'audited',
+          score = ?,
+          updated_at = ?
+        WHERE id = ?
+      `).run(qualityResult.score, now, callId);
+      return {
+        success: true,
+        stage: 'COMPLETED',
+        details: {
+          score: qualityResult.score,
+          is_fatal: qualityResult.is_fatal,
+        },
+      };
+    }
+
     console.log(`[Pipeline] Call #${callId} -> Stage 7: Q1/Q2/Q3/Q4 Compliance Audit`);
     const auditResult = await stage7AuditCall(db, callId, groqApiKey, activeGeminiKey);
 

@@ -10,6 +10,11 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import {
+  CUSTOMER_SUPPORT_PARAMETERS,
+  MUTUAL_FUND_PARAMETERS,
+  EQUITY_REGULAR_PARAMETERS,
+} from './workspace-parameters-def';
 
 export interface WorkspaceSubparameter {
   id: string;
@@ -34,20 +39,23 @@ export interface WorkspaceParameter {
   updated_at: string;
 }
 
+export interface WorkspaceUserDef {
+  username: string;
+  email: string;
+  full_name: string;
+  password: string;
+  role: string;
+}
+
 export interface WorkspaceDefinition {
   id: string;
   name: string;
   tagline: string;
   description: string;
-  category: 'equity' | 'mutual_fund' | 'support';
+  category: 'equity' | 'mutual_fund' | 'support' | 'system_admin';
   dbFileName: string;
-  defaultUser: {
-    username: string;
-    email: string;
-    full_name: string;
-    password: string;
-    role: string;
-  };
+  defaultUser: WorkspaceUserDef;
+  additionalUsers?: WorkspaceUserDef[];
   starterParameters: Array<{
     param_key: string;
     title: string;
@@ -61,22 +69,23 @@ export interface WorkspaceDefinition {
 }
 
 // -------------------------------------------------------------
-// The 9 Authoritative Workspaces Definition
+// The 10 Authoritative Workspaces Definition
 // -------------------------------------------------------------
 export const WORKSPACES: WorkspaceDefinition[] = [
+  // 1. Pre-order Regulatory Desk (Equity)
   {
     id: 'preorder_desk',
     name: 'Pre-order Regulatory Desk',
     tagline: 'SEBI Voice Mandate Compliance',
     description: 'SEBI Regulatory Pre-Order Voice & Quality Audit Engine (Untouched primary system)',
     category: 'equity',
-    dbFileName: 'auditeq_production.db', // Points to primary production database
+    dbFileName: 'auditeq_production.db',
     defaultUser: {
-      username: 'preorder',
-      email: 'preorder.regulatory@fundsindia.com',
-      full_name: 'Pre-Order Compliance Officer',
+      username: 'ashutosh.kumar@fundsindia.com',
+      email: 'ashutosh.kumar@fundsindia.com',
+      full_name: 'Ashutosh Kumar',
       password: process.env.ADMIN_PASSWORD || 'Fi*119147',
-      role: 'admin',
+      role: 'Quality',
     },
     starterParameters: [
       {
@@ -145,654 +154,194 @@ export const WORKSPACES: WorkspaceDefinition[] = [
       },
     ],
   },
+
+  // 2. Customer Support (Support) - Call Audit Quality Scorecard (Image 2)
   {
     id: 'customer_support',
-    name: 'Customer support',
-    tagline: 'Service Excellence & Query Resolution',
-    description: 'Customer Support Quality Assurance & Ticket Resolution Audit Desk',
+    name: 'Customer Support',
+    tagline: 'Support Call Audit Quality Desk',
+    description: 'Customer Support 5-mark Call Quality & Resolution Audit Scorecard',
     category: 'support',
     dbFileName: 'customer_support.db',
     defaultUser: {
-      username: 'cs_support',
-      email: 'support.qa@fundsindia.com',
-      full_name: 'Customer Support Lead',
+      username: 'dharanieshwar.a@fundsindia.com',
+      email: 'dharanieshwar.a@fundsindia.com',
+      full_name: 'Dharanieshwar A',
       password: 'Support@Secure#92',
-      role: 'support_lead',
+      role: 'Quality',
     },
-    starterParameters: [
-      {
-        param_key: 'CS01',
-        title: 'Professional Greeting & Caller Verification',
-        category: 'Greeting & Verification',
-        question: 'Did the executive greet the customer warmly and verify caller identity?',
-        fatal: false,
-        weight: 10,
-        rule: 'Greet with branded intro, ask client name & verify registered mobile or client ID.',
-        subparameters: [
-          { id: 'cs01_1', title: 'Branded Company Greeting', description: 'Stated company name and executive name clearly', mandatory: true },
-          { id: 'cs01_2', title: 'Caller Verification', description: 'Verified Client ID or registered telephone number', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'CS02',
-        title: 'Security & Confidentiality Protocol',
-        category: 'Security',
-        question: 'Was OTP or sensitive password never solicited or revealed over call?',
-        fatal: true,
-        weight: 25,
-        rule: 'FATAL violation if executive asked customer for trading password, MPIN, or bank OTP.',
-        subparameters: [
-          { id: 'cs02_1', title: 'Zero Password / OTP Solicitation', description: 'Explicit prohibition of asking for confidential credentials', mandatory: true },
-          { id: 'cs02_2', title: 'Secure Identity Protocol Followed', description: 'Followed standard 2-point non-intrusive verification', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'CS03',
-        title: 'Active Listening & Problem Understanding',
-        category: 'Communication',
-        question: 'Did the executive listen actively without interrupting and acknowledge query?',
-        fatal: false,
-        weight: 15,
-        rule: 'No cross-talk, polite paraphrasing of the issue, and empathetic acknowledgment.',
-        subparameters: [
-          { id: 'cs03_1', title: 'No Cross-Talk / Interruption', description: 'Allowed customer to complete explanation without interruption', mandatory: true },
-          { id: 'cs03_2', title: 'Query Paraphrasing', description: 'Repeated core issue back to client to confirm alignment', mandatory: false },
-        ],
-      },
-      {
-        param_key: 'CS04',
-        title: 'Accurate Information & First Call Resolution (FCR)',
-        category: 'Resolution',
-        question: 'Was correct technical / portal guidance provided to resolve query?',
-        fatal: false,
-        weight: 20,
-        rule: 'Accurate step-by-step guidance on FundsIndia portal or app features provided.',
-        subparameters: [
-          { id: 'cs04_1', title: 'Factual Accuracy', description: 'Correct navigation paths, fund details, and turnaround times given', mandatory: true },
-          { id: 'cs04_2', title: 'FCR Delivery', description: 'Attempted complete resolution without unwarranted re-routing', mandatory: false },
-        ],
-      },
-      {
-        param_key: 'CS05',
-        title: 'Professional Hold & Mute Etiquette',
-        category: 'Call Handling',
-        question: 'Were hold permissions sought and updates given every 60 seconds?',
-        fatal: false,
-        weight: 10,
-        rule: 'Request permission before hold, hold duration under 2 minutes with status refresh.',
-        subparameters: [
-          { id: 'cs05_1', title: 'Permission Before Placing On Hold', description: 'Politely asked for permission with estimated duration', mandatory: true },
-          { id: 'cs05_2', title: 'Thanked Caller Upon Returning', description: 'Thanked customer for holding upon unmuting', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'CS06',
-        title: 'Ticket Logging & Reference Number Sharing',
-        category: 'Documentation',
-        question: 'Was an official support ticket reference generated and provided?',
-        fatal: false,
-        weight: 10,
-        rule: 'State CRM service request ticket ID or SMS confirmation ETA.',
-        subparameters: [
-          { id: 'cs06_1', title: 'Ticket Reference Shared', description: 'Provided CRM ticket ID to caller for tracking', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'CS07',
-        title: 'Polite Call Closing & Further Assistance Offer',
-        category: 'Closing',
-        question: 'Did executive offer further assistance and thank customer before disconnect?',
-        fatal: false,
-        weight: 10,
-        rule: 'Asked "Is there anything else I can assist you with today?" before formal signoff.',
-        subparameters: [
-          { id: 'cs07_1', title: 'Offered Further Assistance', description: 'Checked if any other services needed', mandatory: true },
-          { id: 'cs07_2', title: 'Warm Closing Signoff', description: 'Used polite brand closing statement', mandatory: true },
-        ],
-      },
-    ],
+    starterParameters: CUSTOMER_SUPPORT_PARAMETERS,
   },
+
+  // 3. MF Gold (Mutual Fund) - Call Audit Quality Scorecard (Image 3)
   {
     id: 'mf_gold',
     name: 'MF Gold',
-    tagline: 'High-Value Portfolio Advisory Audit',
-    description: 'Mutual Fund Gold Tier Advisory, Asset Allocation & Portfolio Review Audit Desk',
+    tagline: 'Gold Wealth Advisory Quality Scorecard',
+    description: 'Mutual Fund Gold Tier 5-mark Quality & Advisory Audit Desk',
     category: 'mutual_fund',
     dbFileName: 'mf_gold.db',
     defaultUser: {
-      username: 'mfgold_desk',
-      email: 'gold.wealth@fundsindia.com',
-      full_name: 'MF Gold Wealth Lead',
+      username: 'asina.banu@fundsindia.com',
+      email: 'asina.banu@fundsindia.com',
+      full_name: 'Asina Banu',
       password: 'GoldAdvisory*83$',
-      role: 'mf_gold_lead',
+      role: 'Quality',
     },
-    starterParameters: [
-      {
-        param_key: 'MFG01',
-        title: 'Client Risk Profile & Goal Horizon Alignment',
-        category: 'Suitability',
-        question: 'Was recommendation strictly aligned with customer documented risk tolerance?',
-        fatal: true,
-        weight: 25,
-        rule: 'FATAL if aggressive equity fund recommended to conservative/low-risk investor.',
-        subparameters: [
-          { id: 'mfg01_1', title: 'Risk Scorecard Verification', description: 'Reconfirmed client risk profile before recommending schemes', mandatory: true },
-          { id: 'mfg01_2', title: 'Investment Horizon Suitability', description: 'Verified investment horizon matches scheme duration (>3-5 yrs for equity)', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'MFG02',
-        title: 'TER, Exit Load & Expense Disclosure',
-        category: 'Regulatory',
-        question: 'Were Total Expense Ratio (TER), exit loads, and lock-in terms explained?',
-        fatal: false,
-        weight: 20,
-        rule: 'State scheme exit load tenure, lock-in for ELSS (3 years), and tax implications.',
-        subparameters: [
-          { id: 'mfg02_1', title: 'Exit Load Structure Disclosed', description: 'Explained percentage deduction if redeemed within cut-off', mandatory: true },
-          { id: 'mfg02_2', title: 'Tax Implications Overview', description: 'Explained LTCG / STCG tax rules clearly without giving tax advice', mandatory: false },
-        ],
-      },
-      {
-        param_key: 'MFG03',
-        title: 'Benchmark & Historical Performance Context',
-        category: 'Product Transparency',
-        question: 'Was scheme performance presented against benchmark with statutory disclaimer?',
-        fatal: false,
-        weight: 15,
-        rule: 'Include "Past performance does not guarantee future results" disclaimer.',
-        subparameters: [
-          { id: 'mfg03_1', title: 'TRI Benchmark Comparison', description: 'Compared returns against Nifty 50 TRI or Category Average', mandatory: true },
-          { id: 'mfg03_2', title: 'Mandatory Risk Disclaimer', description: 'Delivered standard mutual funds market risk warning', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'MFG04',
-        title: 'No Guaranteed Returns or Assured Dividend Claims',
-        category: 'Compliance Integrity',
-        question: 'Did advisor strictly refrain from promising guaranteed yield or dividend rates?',
-        fatal: true,
-        weight: 25,
-        rule: 'FATAL violation if advisor claimed fixed return, zero-risk, or assured payouts.',
-        subparameters: [
-          { id: 'mfg04_1', title: 'Zero Return Commitment', description: 'Absolute prohibition of guaranteed capital or growth promises', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'MFG05',
-        title: 'SIP / Lumpsum Transaction Mandate Confirmation',
-        category: 'Execution',
-        question: 'Were scheme name, folio number, SIP date, and installment amount confirmed?',
-        fatal: false,
-        weight: 15,
-        rule: 'Explicit confirmation of monthly deduction date, amount, and NACH/e-mandate.',
-        subparameters: [
-          { id: 'mfg05_1', title: 'Installment & Date Confirmation', description: 'Confirmed recurring debit date and monthly sum', mandatory: true },
-          { id: 'mfg05_2', title: 'Direct vs Regular Option Disclosed', description: 'Accurate scheme name with growth/dividend option recorded', mandatory: true },
-        ],
-      },
-    ],
+    starterParameters: MUTUAL_FUND_PARAMETERS,
   },
+
+  // 4. MF Silver (Mutual Fund) - Call Audit Quality Scorecard (Image 3)
   {
     id: 'mf_silver',
     name: 'MF Silver',
-    tagline: 'Standard Tier MF Advisory & Review',
-    description: 'Mutual Fund Silver Tier Retail Advisory & Systematic Investment Audit Desk',
+    tagline: 'Silver Wealth Advisory Quality Scorecard',
+    description: 'Mutual Fund Silver Tier 5-mark Quality & Advisory Audit Desk',
     category: 'mutual_fund',
     dbFileName: 'mf_silver.db',
     defaultUser: {
-      username: 'mfsilver_desk',
-      email: 'silver.retail@fundsindia.com',
-      full_name: 'MF Silver Retail Lead',
+      username: 'asina.banu@fundsindia.com#mf_silver',
+      email: 'asina.banu@fundsindia.com',
+      full_name: 'Asina Banu',
       password: 'SilverWealth#47!',
-      role: 'mf_silver_lead',
+      role: 'Quality',
     },
-    starterParameters: [
-      {
-        param_key: 'MFS01',
-        title: 'Identity Verification & Folio Linkage',
-        category: 'Verification',
-        question: 'Did the advisor confirm customer identity and active folio credentials?',
-        fatal: false,
-        weight: 15,
-        rule: 'Verify caller registered name, registered mobile, and client code.',
-        subparameters: [
-          { id: 'mfs01_1', title: 'Caller Verification', description: 'Checked client code and registered mobile', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'MFS02',
-        title: 'Scheme Objective & Category Explanation',
-        category: 'Advisory',
-        question: 'Was the fund category (Large Cap, Flexi Cap, Debt, Hybrid) explained?',
-        fatal: false,
-        weight: 20,
-        rule: 'Explain asset allocation and risk profile of the recommended category.',
-        subparameters: [
-          { id: 'mfs02_1', title: 'Category Risk Level Stated', description: 'Explained equity vs debt allocation clearly', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'MFS03',
-        title: 'Statutory SEBI Riskometer Disclosure',
-        category: 'Compliance',
-        question: 'Was the SEBI Riskometer level (Moderate, High, Very High) communicated?',
-        fatal: true,
-        weight: 25,
-        rule: 'FATAL if high-risk fund sold without disclosing Very High riskometer rating.',
-        subparameters: [
-          { id: 'mfs03_1', title: 'Riskometer Disclosure', description: 'Disclosed official SEBI scheme riskometer status', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'MFS04',
-        title: 'SIP Mandate & Bank Account Confirmation',
-        category: 'Transaction',
-        question: 'Was linked bank account ending digits and auto-debit process verified?',
-        fatal: false,
-        weight: 20,
-        rule: 'Confirm last 4 digits of registered bank account for SIP mandate authorization.',
-        subparameters: [
-          { id: 'mfs04_1', title: 'Bank Account Masked Verification', description: 'Confirmed last 4 digits of bank account with customer', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'MFS05',
-        title: 'Zero Return Commitment & Risk Disclosure',
-        category: 'Compliance Integrity',
-        question: 'Was zero return guarantee maintained and statutory market risk stated?',
-        fatal: true,
-        weight: 20,
-        rule: 'FATAL if advisor promised assured capital protection or specific CAGR returns.',
-        subparameters: [
-          { id: 'mfs05_1', title: 'No Return Guarantees', description: 'Zero profit promises or guaranteed returns', mandatory: true },
-        ],
-      },
-    ],
+    starterParameters: MUTUAL_FUND_PARAMETERS,
   },
+
+  // 5. MF Digital (Mutual Fund) - Call Audit Quality Scorecard (Image 3)
   {
     id: 'mf_digital',
     name: 'MF Digital',
-    tagline: 'Digital Platforms & App Experience',
-    description: 'Mutual Fund App, Web Portal & Digital Ingestion Workflow Audit Desk',
+    tagline: 'Digital Operations & App Support QA',
+    description: 'Mutual Fund Digital Operations 5-mark Quality Audit Desk',
     category: 'mutual_fund',
     dbFileName: 'mf_digital.db',
     defaultUser: {
-      username: 'mfdigital_desk',
-      email: 'digital.appqa@fundsindia.com',
-      full_name: 'MF Digital Platform Lead',
+      username: 'meenatchi.r@fundsindia.com',
+      email: 'meenatchi.r@fundsindia.com',
+      full_name: 'Meenatchi R',
       password: 'DigitalOps@61&',
-      role: 'mf_digital_lead',
+      role: 'Quality',
     },
-    starterParameters: [
+    additionalUsers: [
       {
-        param_key: 'MFD01',
-        title: 'Digital Portal Navigation & Self-Service Guidance',
-        category: 'Digital Guidance',
-        question: 'Did the executive provide clear, step-by-step guidance on app/web UI?',
-        fatal: false,
-        weight: 20,
-        rule: 'Provide intuitive navigation cues for mobile app and web dashboard features.',
-        subparameters: [
-          { id: 'mfd01_1', title: 'App Screen Walkthrough', description: 'Guided user through mobile app menu items accurately', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'MFD02',
-        title: 'Zero Remote Screen-Share / Unverified App Download',
-        category: 'Cyber Security',
-        question: 'Did the executive strictly avoid asking user to install unauthorized remote tools?',
-        fatal: true,
-        weight: 35,
-        rule: 'FATAL violation if executive asked customer to install AnyDesk, TeamViewer, or third-party APKs.',
-        subparameters: [
-          { id: 'mfd02_1', title: 'No Remote Access Tools', description: 'Never requested installation of third-party remote control tools', mandatory: true },
-          { id: 'mfd02_2', title: 'Official App Store Verification', description: 'Directed only to official Google Play or Apple App Store links', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'MFD03',
-        title: 'Payment Gateway & UPI Flow Explanation',
-        category: 'Transactions',
-        question: 'Were UPI auto-pay, net banking, and NEFT payment cut-off timings explained?',
-        fatal: false,
-        weight: 20,
-        rule: 'Disclose NAV cut-off times (1:30 PM / 3:00 PM) for same-day realization.',
-        subparameters: [
-          { id: 'mfd03_1', title: 'NAV Cut-off Time Explained', description: 'Informed client of funds realization cut-off timings', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'MFD04',
-        title: 'Two-Factor Authentication (2FA) Guidance',
-        category: 'Security',
-        question: 'Was customer guided to activate biometric/OTP 2FA securely?',
-        fatal: false,
-        weight: 25,
-        rule: 'Reminded customer to keep biometric lock and 2FA credentials confidential.',
-        subparameters: [
-          { id: 'mfd04_1', title: '2FA Advice', description: 'Encouraged biometric login activation without asking for PIN', mandatory: true },
-        ],
+        username: 'rajesh.chakravarthi@fundsindia.com',
+        email: 'rajesh.chakravarthi@fundsindia.com',
+        full_name: 'Rajesh Chakravarthi Rao',
+        password: 'DigitalOps@61&',
+        role: 'Quality',
       },
     ],
+    starterParameters: MUTUAL_FUND_PARAMETERS,
   },
+
+  // 6. MF Onboarding (Mutual Fund) - Call Audit Quality Scorecard (Image 3)
   {
     id: 'mf_onboarding',
     name: 'MF Onboarding',
-    tagline: 'KYC & Initial Account Setup Audit',
-    description: 'Mutual Fund Client Onboarding, e-KYC Verification & Document Audit Desk',
+    tagline: 'KYC & Client Onboarding Quality QA',
+    description: 'Mutual Fund Onboarding 5-mark Quality Audit Desk',
     category: 'mutual_fund',
     dbFileName: 'mf_onboarding.db',
     defaultUser: {
-      username: 'mfonboard_desk',
-      email: 'mf.kyc@fundsindia.com',
-      full_name: 'MF Onboarding Lead',
+      username: 'meenatchi.r@fundsindia.com#mf_onboarding',
+      email: 'meenatchi.r@fundsindia.com',
+      full_name: 'Meenatchi R',
       password: 'OnboardKyc*35^',
-      role: 'mf_onboarding_lead',
+      role: 'Quality',
     },
-    starterParameters: [
+    additionalUsers: [
       {
-        param_key: 'MFO01',
-        title: 'PAN & KRA KYC Status Verification',
-        category: 'KYC Compliance',
-        question: 'Was PAN validity and CVL/NDML/CAMS KRA status verified accurately?',
-        fatal: true,
-        weight: 25,
-        rule: 'FATAL if account processed without verified KRA registered/validated PAN status.',
-        subparameters: [
-          { id: 'mfo01_1', title: 'KRA Database Verification', description: 'Cross-checked PAN with CVL/CAMS/NDML KRA registry', mandatory: true },
-          { id: 'mfo01_2', title: 'Aadhaar-PAN Linkage Confirmation', description: 'Confirmed PAN is operative and linked with Aadhaar', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'MFO02',
-        title: 'FATCA & UBO Declaration Verification',
-        category: 'Regulatory',
-        question: 'Were FATCA tax residency and Ultimate Beneficial Ownership declarations taken?',
-        fatal: true,
-        weight: 20,
-        rule: 'FATAL if NRI or foreign tax resident onboarded without mandatory FATCA declaration.',
-        subparameters: [
-          { id: 'mfo02_1', title: 'Indian Tax Residency Confirmed', description: 'Confirmed tax residency exclusively in India or recorded foreign tax ID', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'MFO03',
-        title: 'Bank Account Penny Drop / Cheque Proof Validation',
-        category: 'Banking Compliance',
-        question: 'Was bank verification completed via automated penny drop or cancelled cheque?',
-        fatal: true,
-        weight: 25,
-        rule: 'FATAL if third-party bank account linked or name mismatch ignored.',
-        subparameters: [
-          { id: 'mfo03_1', title: 'Penny Drop Name Match', description: 'Beneficiary name matches PAN name precisely (>80% fuzzy match)', mandatory: true },
-          { id: 'mfo03_2', title: 'IFSC & Account Type Verified', description: 'Confirmed correct IFSC branch and Savings/NRE account type', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'MFO04',
-        title: 'Nominee Opt-in / Opt-out Declaration',
-        category: 'SEBI Compliance',
-        question: 'Was nominee registration or explicit SEBI opt-out declaration executed?',
-        fatal: false,
-        weight: 15,
-        rule: 'Ensure nominee name, relationship, and allocation percentage or signed opt-out.',
-        subparameters: [
-          { id: 'mfo04_1', title: 'Nominee Details Verified', description: 'Name, relationship, and 100% share allocation recorded', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'MFO05',
-        title: 'Turnaround Time (TAT) Communication',
-        category: 'Customer Experience',
-        question: 'Was the client clearly informed of the 24-48 hr verification TAT and next steps?',
-        fatal: false,
-        weight: 15,
-        rule: 'State realistic TAT for account activation and welcome email delivery.',
-        subparameters: [
-          { id: 'mfo05_1', title: 'Clear Next Steps Communicated', description: 'Informed client of first SIP date and portal credentials delivery', mandatory: true },
-        ],
+        username: 'rajesh.chakravarthi@fundsindia.com#mf_onboarding',
+        email: 'rajesh.chakravarthi@fundsindia.com',
+        full_name: 'Rajesh Chakravarthi Rao',
+        password: 'OnboardKyc*35^',
+        role: 'Quality',
       },
     ],
+    starterParameters: MUTUAL_FUND_PARAMETERS,
   },
+
+  // 7. Equity Onboarding (Equity) - Call Audit Quality Scorecard (Image 4)
   {
     id: 'equity_onboarding',
     name: 'Equity Onboarding',
-    tagline: 'Trading & Demat Account Onboarding',
-    description: 'Equity Brokerage, Demat Account Opening & Exchange Registration Audit Desk',
+    tagline: 'Demat Onboarding Verification QA',
+    description: 'Equity Demat & Trading Onboarding 5-mark Quality Audit Desk',
     category: 'equity',
     dbFileName: 'equity_onboarding.db',
     defaultUser: {
-      username: 'eqonboard_desk',
-      email: 'equity.demat@fundsindia.com',
-      full_name: 'Equity Demat Onboarding Lead',
+      username: 'dharanieshwar.a@fundsindia.com#equity_onboarding',
+      email: 'dharanieshwar.a@fundsindia.com',
+      full_name: 'Dharanieshwar A',
       password: 'EqDemat#74$',
-      role: 'equity_onboarding_lead',
+      role: 'Quality',
     },
-    starterParameters: [
-      {
-        param_key: 'EQO01',
-        title: 'IPV (In-Person Verification) & Geo-Tagging Compliance',
-        category: 'SEBI Demat Norms',
-        question: 'Was live video IPV conducted with geo-tagging, timestamp & OTP confirmation?',
-        fatal: true,
-        weight: 30,
-        rule: 'FATAL violation if IPV video is missing, pre-recorded, or unreadable ID shown.',
-        subparameters: [
-          { id: 'eqo01_1', title: 'Live Video Feed Verified', description: 'Customer face clearly visible alongside original PAN card', mandatory: true },
-          { id: 'eqo01_2', title: 'Geo-Coordinates & Real-Time OTP Recorded', description: 'GPS coordinates within Indian territory and random verification code spoken', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'EQO02',
-        title: 'Segment Selection & Derivative Income Proof Verification',
-        category: 'Exchange Regulations',
-        question: 'Was valid income proof (6-mo bank statement / ITR) verified for F&O/Currency?',
-        fatal: true,
-        weight: 25,
-        rule: 'FATAL if F&O/Derivatives activated without verified financial income proof.',
-        subparameters: [
-          { id: 'eqo02_1', title: 'Income Document Authenticity', description: 'Verified salary slip, ITR-V, Form 16, or 6-month bank statement', mandatory: true },
-          { id: 'eqo02_2', title: 'Segment Consent Recorded', description: 'Explicit opt-in recorded for NSE/BSE Cash and F&O segments', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'EQO03',
-        title: 'Tariff & Brokerage Schedule Disclosure',
-        category: 'Transparency',
-        question: 'Were brokerage charges, STT, exchange turnover fees, and AMC disclosed?',
-        fatal: false,
-        weight: 20,
-        rule: 'Disclose delivery brokerage, intraday charges, and demat annual maintenance fee.',
-        subparameters: [
-          { id: 'eqo03_1', title: 'Clear Brokerage Rate Stated', description: 'Explained flat fee or percentage per executed trade', mandatory: true },
-          { id: 'eqo03_2', title: 'Statutory Taxes Disclosed', description: 'Mentioned STT, GST, Stamp Duty, and SEBI turnover charges', mandatory: false },
-        ],
-      },
-      {
-        param_key: 'EQO04',
-        title: 'POA / DDPI (Demat Debit and Pledge Instruction) Explanation',
-        category: 'Compliance',
-        question: 'Were DDPI limits and electronic delivery authentication (EDIS) explained?',
-        fatal: false,
-        weight: 15,
-        rule: 'Explain why DDPI is used exclusively for settlement of sell trades.',
-        subparameters: [
-          { id: 'eqo04_1', title: 'Scope of DDPI Restricted to Sell Obligations', description: 'Clarified DDPI cannot be used for unauthorized transfers', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'EQO05',
-        title: 'Aadhaar e-Sign Verification',
-        category: 'Digital Verification',
-        question: 'Was NSDL/CDSL e-sign executed via customer registered Aadhaar OTP?',
-        fatal: true,
-        weight: 10,
-        rule: 'FATAL if signature uploaded without UIDAI Aadhaar OTP verification.',
-        subparameters: [
-          { id: 'eqo05_1', title: 'NSDL Electronic Signature Verified', description: 'Tamper-proof digital signature verified on final KYC PDF', mandatory: true },
-        ],
-      },
-    ],
+    starterParameters: EQUITY_REGULAR_PARAMETERS,
   },
+
+  // 8. Equity Regular (Equity) - Call Audit Quality Scorecard (Image 4)
   {
     id: 'equity_regular',
     name: 'Equity Regular',
-    tagline: 'Standard Equity Trading & Dealer Support',
-    description: 'Equity Dealing Desk Regular Operations, Order Routing & Advisory Quality Audit Desk',
+    tagline: 'Equity Broking Quality Scorecard',
+    description: 'Equity Regular Trading & Advisory 5-mark Quality Audit Desk',
     category: 'equity',
     dbFileName: 'equity_regular.db',
     defaultUser: {
-      username: 'eqregular_desk',
-      email: 'equity.regular@fundsindia.com',
-      full_name: 'Equity Regular Dealing Lead',
+      username: 'ashutosh.kumar@fundsindia.com#equity_regular',
+      email: 'ashutosh.kumar@fundsindia.com',
+      full_name: 'Ashutosh Kumar',
       password: 'EqTrader@58!',
-      role: 'equity_regular_lead',
+      role: 'Quality',
     },
-    starterParameters: [
-      {
-        param_key: 'EQR01',
-        title: 'Registered Contact Authorization',
-        category: 'Authentication',
-        question: 'Was order instructed strictly from client registered/authorized contact number?',
-        fatal: true,
-        weight: 20,
-        rule: 'FATAL if order accepted from unregistered third-party phone number without mandate.',
-        subparameters: [
-          { id: 'eqr01_1', title: 'Caller CLI Match', description: 'Caller ID verified against CRM registered contact', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'EQR02',
-        title: 'Accurate Scrip, Exchange & Order Type Specification',
-        category: 'Trade Precision',
-        question: 'Were scrip name, exchange (NSE/BSE), order type (Limit/Market/SL), and side confirmed?',
-        fatal: false,
-        weight: 25,
-        rule: 'Executive confirmed BUY/SELL, exact quantity, price, and validity (Day/IOC).',
-        subparameters: [
-          { id: 'eqr02_1', title: 'Buy / Sell Direction Confirmed', description: 'Explicit verification of trade direction', mandatory: true },
-          { id: 'eqr02_2', title: 'Exchange & Product Type (CNC / MIS)', description: 'Confirmed whether delivery (CNC) or intraday (MIS/Margin)', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'EQR03',
-        title: 'Available Margin & Funds Check',
-        category: 'Risk Management',
-        question: 'Did executive verify available ledger balance / margin before order placement?',
-        fatal: false,
-        weight: 20,
-        rule: 'Disclose required upfront margin and peak margin compliance.',
-        subparameters: [
-          { id: 'eqr03_1', title: 'Margin Verification', description: 'Checked client trade limit and upfront margin adequacy', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'EQR04',
-        title: 'Customer Explicit Verbal Confirmation',
-        category: 'Consent',
-        question: 'Did customer explicitly authorize trade execution in unequivocal words?',
-        fatal: true,
-        weight: 20,
-        rule: 'FATAL if trade placed on assumption without verbal customer authorization.',
-        subparameters: [
-          { id: 'eqr04_1', title: 'Explicit Verbal Authorization', description: 'Customer gave clear verbal order command before execution', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'EQR05',
-        title: 'Zero Return Commitment & Risk Disclosure',
-        category: 'Compliance Integrity',
-        question: 'Did dealer refrain from offering profit guarantees or speculative tips?',
-        fatal: true,
-        weight: 15,
-        rule: 'FATAL if dealer promised target returns, tips, or assured price appreciation.',
-        subparameters: [
-          { id: 'eqr05_1', title: 'Zero Profit Assurances', description: 'No guaranteed returns or unauthorized personal tips given', mandatory: true },
-        ],
-      },
-    ],
+    starterParameters: EQUITY_REGULAR_PARAMETERS,
   },
+
+  // 9. MF Platinum (Mutual Fund) - Call Audit Quality Scorecard (Image 3)
   {
     id: 'mf_platinum',
-    name: 'MF platinum',
-    tagline: 'HNW & Ultra-HNW Wealth Desk',
-    description: 'Mutual Fund Platinum Tier Wealth Advisory, PMS / AIF Consultation & Bespoke Audit Desk',
+    name: 'MF Platinum',
+    tagline: 'Platinum HNI Wealth Advisory QA',
+    description: 'Mutual Fund Platinum HNI 5-mark Quality & Advisory Audit Desk',
     category: 'mutual_fund',
     dbFileName: 'mf_platinum.db',
     defaultUser: {
-      username: 'mfplatinum_desk',
-      email: 'platinum.hni@fundsindia.com',
-      full_name: 'MF Platinum HNW Desk Lead',
+      username: 'ashwini.prabhu@fundsindia.com',
+      email: 'ashwini.prabhu@fundsindia.com',
+      full_name: 'Ashwini Prabhu N N',
       password: 'PlatinumHni*19#',
-      role: 'mf_platinum_lead',
+      role: 'Quality',
     },
-    starterParameters: [
+    starterParameters: MUTUAL_FUND_PARAMETERS,
+  },
+
+  // 10. Global Compliance Administrator (System Admin) - Multi-DB / Switchable
+  {
+    id: 'compliance_admin',
+    name: 'Global Compliance Administrator',
+    tagline: 'Multi-Workspace Supervision & Audit Governance',
+    description: 'Global Compliance Administrator Multi-DB Switchable Management Console',
+    category: 'system_admin',
+    dbFileName: 'auditeq_production.db',
+    defaultUser: {
+      username: 'ashwini.prabhu@fundsindia.com#compliance_admin',
+      email: 'ashwini.prabhu@fundsindia.com',
+      full_name: 'Ashwini Prabhu N N',
+      password: 'Admin*119147',
+      role: 'admin',
+    },
+    additionalUsers: [
       {
-        param_key: 'MFP01',
-        title: 'Dedicated RM Greeting & HNW Etiquette',
-        category: 'Executive Service',
-        question: 'Did dedicated Relationship Manager greet client with executive warmth & verify portfolio?',
-        fatal: false,
-        weight: 15,
-        rule: 'Address client respectfully by title/name, reference family office / folio context.',
-        subparameters: [
-          { id: 'mfp01_1', title: 'Executive Relationship Greeting', description: 'Greeted client with high-touch personalized professionalism', mandatory: true },
-          { id: 'mfp01_2', title: 'Portfolio Context Acknowledged', description: 'Referenced existing asset allocation and mandate history', mandatory: false },
-        ],
-      },
-      {
-        param_key: 'MFP02',
-        title: 'Accredited Investor / Risk Profiling Verification',
-        category: 'Suitability',
-        question: 'Was comprehensive risk appetite and net-worth suitability evaluated?',
-        fatal: true,
-        weight: 25,
-        rule: 'FATAL if high-risk structured products recommended without HNW risk profiling.',
-        subparameters: [
-          { id: 'mfp02_1', title: 'Net-worth Suitability Verification', description: 'Confirmed client qualifies under SEBI HNW/Accredited guidelines', mandatory: true },
-          { id: 'mfp02_2', title: 'Liquidity & Drawdown Tolerance Evaluated', description: 'Discussed portfolio drawdown limits and liquidity horizon', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'MFP03',
-        title: 'Detailed Portfolio Attribution & Asset Allocation Rationale',
-        category: 'Advisory Quality',
-        question: 'Was comprehensive investment thesis, Sharpe ratio, and alpha attribution articulated?',
-        fatal: false,
-        weight: 20,
-        rule: 'Discuss manager track record, downside protection, portfolio concentration, and debt duration.',
-        subparameters: [
-          { id: 'mfp03_1', title: 'Investment Thesis Articulated', description: 'Explained fundamental and macro reasoning for asset allocation', mandatory: true },
-          { id: 'mfp03_2', title: 'Comparative Analysis Given', description: 'Compared against peer funds and benchmark over 5-10 year market cycles', mandatory: false },
-        ],
-      },
-      {
-        param_key: 'MFP04',
-        title: 'Statutory Fee, Hurdle Rate & High-Water Mark Transparency',
-        category: 'Fee Transparency',
-        question: 'Were management fees, hurdle rates, performance fees, and GST clearly specified?',
-        fatal: false,
-        weight: 15,
-        rule: 'Full disclosure of all direct/regular expense ratios and advisory fees in writing and verbally.',
-        subparameters: [
-          { id: 'mfp04_1', title: 'Transparent Fee Breakdown', description: 'Disclosed exact percentage fee and performance fee thresholds', mandatory: true },
-        ],
-      },
-      {
-        param_key: 'MFP05',
-        title: 'Zero Return Commitment Guarantee',
-        category: 'Compliance Integrity',
-        question: 'Did Wealth Manager strictly refrain from assuring capital protection or target yields?',
-        fatal: true,
-        weight: 25,
-        rule: 'FATAL violation if Wealth Manager guaranteed principal protection or promised specific CAGR returns.',
-        subparameters: [
-          { id: 'mfp05_1', title: 'Zero Capital or Return Guarantee', description: 'Absolute compliance with SEBI prohibition of assured returns', mandatory: true },
-          { id: 'mfp05_2', title: 'Market Volatility Risk Addressed', description: 'Explicitly highlighted potential equity volatility and credit risks', mandatory: true },
-        ],
+        username: 'ashutosh.kumar@fundsindia.com#compliance_admin',
+        email: 'ashutosh.kumar@fundsindia.com',
+        full_name: 'Ashutosh Kumar',
+        password: 'Admin*119147',
+        role: 'admin',
       },
     ],
+    starterParameters: CUSTOMER_SUPPORT_PARAMETERS,
   },
 ];
 
@@ -1342,35 +891,43 @@ export function ensureWorkspaceSchema(db: DatabaseSync, workspaceId: string): vo
     `);
   } catch {}
 
-  // Initialize starter parameters if empty
-  const countRow = db.prepare('SELECT count(*) as c FROM workspace_parameters').get() as { c: number };
-  if ((countRow?.c || 0) === 0) {
-    const wsDef = getWorkspaceById(workspaceId);
-    if (wsDef && wsDef.starterParameters.length > 0) {
-      const now = new Date().toISOString();
-      const insertStmt = db.prepare(`
-        INSERT INTO workspace_parameters (param_key, title, category, question, fatal, weight, rule, subparameters, display_order, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-      wsDef.starterParameters.forEach((p, idx) => {
-        try {
-          insertStmt.run(
-            p.param_key,
-            p.title,
-            p.category,
-            p.question,
-            p.fatal ? 1 : 0,
-            p.weight,
-            p.rule,
-            JSON.stringify(p.subparameters || []),
-            idx + 1,
-            now,
-            now
-          );
-        } catch {
-          // ignore unique constraint
-        }
-      });
+  // Initialize or refresh starter parameters to match official quality scorecard rubrics
+  const wsDef = getWorkspaceById(workspaceId);
+  if (wsDef && wsDef.starterParameters && wsDef.starterParameters.length > 0) {
+    const existingParams = db.prepare('SELECT param_key FROM workspace_parameters').all() as Array<{ param_key: string }>;
+    const officialKeys = new Set(wsDef.starterParameters.map((p) => p.param_key));
+    const isOutdated = existingParams.length === 0 || !existingParams.some((p) => officialKeys.has(p.param_key));
+
+    if (isOutdated) {
+      try {
+        db.prepare('DELETE FROM workspace_parameters').run();
+        const now = new Date().toISOString();
+        const insertStmt = db.prepare(`
+          INSERT INTO workspace_parameters (param_key, title, category, question, fatal, weight, rule, subparameters, display_order, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        wsDef.starterParameters.forEach((p, idx) => {
+          try {
+            insertStmt.run(
+              p.param_key,
+              p.title,
+              p.category,
+              p.question,
+              p.fatal ? 1 : 0,
+              p.weight,
+              p.rule,
+              JSON.stringify(p.subparameters || []),
+              idx + 1,
+              now,
+              now
+            );
+          } catch {
+            // ignore unique constraint
+          }
+        });
+      } catch (err: any) {
+        console.warn(`[Workspace] Notice seeding parameters for "${workspaceId}":`, err?.message);
+      }
     }
   }
 }
@@ -1384,7 +941,25 @@ export function initAllWorkspaces(primarySqlite: DatabaseSync): void {
   // Register primary database connection
   workspaceConnections.set('preorder_desk', primarySqlite);
 
-  // Ensure workspace_parameters table exists in primary database too for consistency
+  // Ensure workspace_parameters and users table exist in primary database
+  try {
+    primarySqlite.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        email TEXT,
+        full_name TEXT,
+        password_hash TEXT NOT NULL,
+        salt TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'Quality',
+        token TEXT,
+        token_expires_at TEXT,
+        workspace_id TEXT DEFAULT 'preorder_desk',
+        created_at TEXT NOT NULL
+      );
+    `);
+  } catch {}
+
   try {
     ensureWorkspaceSchema(primarySqlite, 'preorder_desk');
   } catch (err: any) {
@@ -1398,7 +973,7 @@ export function initAllWorkspaces(primarySqlite: DatabaseSync): void {
     // Column already exists
   }
 
-  // Initialize the remaining 8 workspace databases
+  // Initialize all remaining workspace databases
   for (const ws of WORKSPACES) {
     if (ws.id === 'preorder_desk') continue;
 
@@ -1408,7 +983,7 @@ export function initAllWorkspaces(primarySqlite: DatabaseSync): void {
     workspaceConnections.set(ws.id, wsDb);
   }
 
-  // Provision user accounts for all 9 workspaces in primary users table
+  // Provision user accounts for all 10 desks in primary users table
   provisionWorkspaceUsers(primarySqlite);
 }
 
@@ -1420,35 +995,43 @@ export function provisionWorkspaceUsers(primarySqlite: DatabaseSync): void {
   const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
 
   for (const ws of WORKSPACES) {
-    const u = ws.defaultUser;
-    const cleanEmail = u.email.trim().toLowerCase();
-    const cleanUsername = u.username.trim().toLowerCase();
+    const usersToProvision = [ws.defaultUser, ...(ws.additionalUsers || [])];
 
-    let existing: { id: number; workspace_id?: string } | undefined;
-    if (ws.id === 'preorder_desk') {
-      existing = primarySqlite
-        .prepare('SELECT id, workspace_id FROM users WHERE LOWER(username) = ? OR LOWER(email) = ?')
-        .get(cleanUsername, cleanEmail) as { id: number; workspace_id?: string } | undefined;
-    } else {
-      existing = primarySqlite
-        .prepare('SELECT id, workspace_id FROM users WHERE workspace_id = ?')
-        .get(ws.id) as { id: number; workspace_id?: string } | undefined;
-    }
+    for (const u of usersToProvision) {
+      const cleanEmail = u.email.trim().toLowerCase();
+      const cleanUsername = u.username.trim().toLowerCase();
 
-    const salt = crypto.randomBytes(16).toString('hex');
-    const hash = hashUserPassword(u.password, salt);
+      // Check if user account exists for this specific workspace
+      const existing = primarySqlite
+        .prepare('SELECT id, workspace_id FROM users WHERE workspace_id = ? AND (LOWER(email) = ? OR LOWER(username) = ?)')
+        .get(ws.id, cleanEmail, cleanUsername) as { id: number; workspace_id?: string } | undefined;
 
-    if (existing) {
-      primarySqlite
-        .prepare('UPDATE users SET username = ?, email = ?, full_name = ?, role = ?, workspace_id = ?, password_hash = ?, salt = ? WHERE id = ?')
-        .run(cleanUsername, cleanEmail, u.full_name, u.role, ws.id, hash, salt, existing.id);
-    } else {
-      primarySqlite
-        .prepare(`
-          INSERT INTO users (username, email, full_name, password_hash, salt, role, workspace_id, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `)
-        .run(cleanUsername, cleanEmail, u.full_name, hash, salt, u.role, ws.id, now);
+      const salt = crypto.randomBytes(16).toString('hex');
+      const hash = hashUserPassword(u.password, salt);
+
+      if (existing) {
+        primarySqlite
+          .prepare('UPDATE users SET username = ?, email = ?, full_name = ?, role = ?, workspace_id = ?, password_hash = ?, salt = ? WHERE id = ?')
+          .run(cleanUsername, cleanEmail, u.full_name, u.role, ws.id, hash, salt, existing.id);
+      } else {
+        try {
+          primarySqlite
+            .prepare(`
+              INSERT INTO users (username, email, full_name, password_hash, salt, role, workspace_id, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `)
+            .run(cleanUsername, cleanEmail, u.full_name, hash, salt, u.role, ws.id, now);
+        } catch {
+          // If username uniqueness collision, qualify username with workspace
+          const qualifiedUsername = `${cleanUsername}#${ws.id}`;
+          primarySqlite
+            .prepare(`
+              INSERT OR REPLACE INTO users (username, email, full_name, password_hash, salt, role, workspace_id, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `)
+            .run(qualifiedUsername, cleanEmail, u.full_name, hash, salt, u.role, ws.id, now);
+        }
+      }
     }
   }
 }

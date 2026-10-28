@@ -761,19 +761,20 @@ export const PREORDER_SEED_SCORECARDS: PreorderSeedScorecard[] = [
 
 /**
  * Seeds the Pre-order Regulatory Desk database (auditeq_production.db)
- * with the standard pre-order regulatory dataset if empty.
+ * with the complete 1,177 pre-order calls dataset if under 1,177 calls.
  */
 export function seedPreorderWorkspaceData(db: DatabaseSync): void {
   try {
     const callCountRow = db.prepare('SELECT count(*) as c FROM calls').get() as { c: number } | undefined;
-    if (callCountRow && callCountRow.c > 0) {
-      return; // Already populated, do not overwrite user data
+    const currentCount = callCountRow?.c || 0;
+    if (currentCount >= 1177) {
+      return; // Already fully populated with 1,177 calls
     }
 
-    console.log('[PreOrder Seed] Populating Pre-Order Regulatory Desk database with baseline dataset...');
+    console.log(`[PreOrder Seed] Populating Pre-Order Regulatory Desk with full dataset (current: ${currentCount}, target: 1177)...`);
     const now = new Date().toISOString();
 
-    // 1. Insert Trades
+    // 1. Insert Baseline Seed Trades
     const insertTrade = db.prepare(`
       INSERT INTO trades (
         id, external_id, dealer, advisor_name, team, trade_date, trade_time,
@@ -803,12 +804,12 @@ export function seedPreorderWorkspaceData(db: DatabaseSync): void {
           t.price,
           now
         );
-      } catch (e: any) {
+      } catch {
         // ignore duplicate
       }
     }
 
-    // 2. Insert Calls
+    // 2. Insert Baseline Seed Calls
     const insertCall = db.prepare(`
       INSERT INTO calls (
         id, external_id, recording_name, storage_path, dealer, caller_name, team,
@@ -855,12 +856,12 @@ export function seedPreorderWorkspaceData(db: DatabaseSync): void {
           now,
           now
         );
-      } catch (e: any) {
+      } catch {
         // ignore duplicate
       }
     }
 
-    // 3. Insert Matches
+    // 3. Insert Baseline Matches
     const insertMatch = db.prepare(`
       INSERT INTO matches (
         call_id, trade_id, confidence, score_margin, status, created_at
@@ -886,12 +887,12 @@ export function seedPreorderWorkspaceData(db: DatabaseSync): void {
     for (const [cid, tid, conf, margin] of matchPairs) {
       try {
         insertMatch.run(cid, tid, conf, margin, now);
-      } catch (e: any) {
+      } catch {
         // ignore
       }
     }
 
-    // 4. Insert Audits & Scorecards
+    // 4. Insert Baseline Audits & Scorecards
     const insertAudit = db.prepare(`
       INSERT INTO audits (
         id, call_id, trade_id, compliance_disposition, score, status, audit_comment, created_at, updated_at
@@ -949,13 +950,235 @@ export function seedPreorderWorkspaceData(db: DatabaseSync): void {
           now,
           now
         );
-      } catch (e: any) {
+      } catch {
         // ignore
       }
     }
 
-    console.log('[PreOrder Seed] Successfully populated Pre-Order Regulatory Desk with baseline calls, trades, and scorecards.');
+    // 5. Expand Dataset to exactly 1,177 Pre-Order Calls & Clusters
+    const existingCallCount = (db.prepare('SELECT count(*) as c FROM calls').get() as any)?.c || 0;
+    const targetCalls = 1177;
+    const needed = targetCalls - existingCallCount;
+
+    if (needed > 0) {
+      console.log(`[PreOrder Seed] Generating ${needed} pre-order call records to reach 1,177 total calls...`);
+
+      const advisorsPool = [
+        { name: 'Ashutosh', dealer: 'W2649', team: 'Equity Advisory Desk' },
+        { name: 'Ajay Choudary', dealer: 'W1884', team: 'Equity Advisory Desk' },
+        { name: 'Ajeetkumar', dealer: 'W482', team: 'Equity Retail Desk' },
+        { name: 'Arun M', dealer: 'W1864', team: 'Equity Advisory Desk' },
+        { name: 'Kumarraja M', dealer: 'W1008', team: 'Equity Retail Desk' },
+        { name: 'Niranjan', dealer: 'W1003', team: 'Equity Advisory Desk' },
+        { name: 'Preethi B', dealer: 'W1660', team: 'Equity Retail Desk' },
+        { name: 'Ragulgandhi', dealer: 'W1375', team: 'Equity Advisory Desk' },
+        { name: 'Manigandan', dealer: 'W1920', team: 'Equity Advisory Desk' },
+        { name: 'Karthick Raja', dealer: 'W2105', team: 'Equity Advisory Desk' },
+        { name: 'Suresh Kumar', dealer: 'W1540', team: 'Wealth Advisory Desk' },
+        { name: 'Praveen', dealer: 'W1782', team: 'Derivative Desk' },
+        { name: 'Sowmiya', dealer: 'W1634', team: 'Commodity Desk' },
+      ];
+
+      const scripsPool = [
+        { symbol: 'RELIANCE', basePrice: 2850.0 },
+        { symbol: 'TATASTEEL', basePrice: 152.5 },
+        { symbol: 'HDFCBANK', basePrice: 1610.0 },
+        { symbol: 'INFY', basePrice: 1825.0 },
+        { symbol: 'ICICIBANK', basePrice: 1245.0 },
+        { symbol: 'SBIN', basePrice: 815.0 },
+        { symbol: 'TCS', basePrice: 3960.0 },
+        { symbol: 'BAJFINANCE', basePrice: 7150.0 },
+        { symbol: 'LT', basePrice: 3580.0 },
+        { symbol: 'ITC', basePrice: 475.0 },
+        { symbol: 'BHARTIARTL', basePrice: 1640.0 },
+        { symbol: 'KOTAKBANK', basePrice: 1780.0 },
+        { symbol: 'AXISBANK', basePrice: 1190.0 },
+        { symbol: 'MARUTI', basePrice: 12100.0 },
+        { symbol: 'SUNPHARMA', basePrice: 1860.0 },
+        { symbol: 'TITAN', basePrice: 3420.0 },
+        { symbol: 'WIPRO', basePrice: 535.0 },
+        { symbol: 'ASIANPAINT', basePrice: 2980.0 },
+        { symbol: 'HCLTECH', basePrice: 1740.0 },
+        { symbol: 'ULTRACEMCO', basePrice: 11200.0 },
+      ];
+
+      const clientPrefixes = ['WIA', 'WIF', 'WIC', 'WID', 'WIG', 'WIE', 'FIA', 'PWD'];
+
+      const maxCallId = ((db.prepare('SELECT max(id) as m FROM calls').get() as any)?.m || 109) + 1;
+      const maxTradeId = ((db.prepare('SELECT max(id) as m FROM trades').get() as any)?.m || 14) + 1;
+      const maxAuditId = ((db.prepare('SELECT max(id) as m FROM audits').get() as any)?.m || 10) + 1;
+
+      db.exec('BEGIN IMMEDIATE TRANSACTION;');
+      try {
+        for (let i = 0; i < needed; i++) {
+          const callId = maxCallId + i;
+          const tradeId = maxTradeId + i;
+          const auditId = maxAuditId + i;
+
+          const adv = advisorsPool[i % advisorsPool.length];
+          const scrip = scripsPool[i % scripsPool.length];
+          const prefix = clientPrefixes[i % clientPrefixes.length];
+          const clientNum = 10000 + ((i * 37) % 89999);
+          const clientCode = `${prefix}${clientNum}`;
+          const clientName = `Client ${clientCode}`;
+
+          const phoneDigits = String(9800000000 + ((i * 123457) % 99999999)).slice(-10);
+          const phone = phoneDigits.length === 10 ? phoneDigits : `98${String(10000000 + i).slice(-8)}`;
+
+          // Trading hours distribution (09:15 to 15:25)
+          const totalSeconds = 9 * 3600 + 15 * 60 + ((i * 31) % (6 * 3600));
+          const ch = Math.floor(totalSeconds / 3600);
+          const cm = Math.floor((totalSeconds % 3600) / 60);
+          const cs = totalSeconds % 60;
+          const callTime = `${String(ch).padStart(2, '0')}:${String(cm).padStart(2, '0')}:${String(cs).padStart(2, '0')}`;
+
+          // Trade execution time 60-180 seconds after pre-order confirmation call
+          const tradeSec = totalSeconds + 75 + (i % 60);
+          const th = Math.floor(tradeSec / 3600);
+          const tm = Math.floor((tradeSec % 3600) / 60);
+          const ts = tradeSec % 60;
+          const tradeTime = `${String(th).padStart(2, '0')}:${String(tm).padStart(2, '0')}:${String(ts).padStart(2, '0')}`;
+
+          const tradeDate = '2026-10-27';
+          const callDate = '2026-10-27';
+          const qty = ((i % 10) + 1) * 5;
+          const price = +(scrip.basePrice * (1 + ((i % 20) - 10) * 0.002)).toFixed(2);
+          const duration = 65 + ((i * 13) % 150);
+
+          // Realistic compliance disposition: 96.5% pass, 3.5% fatal (unregistered phone, timing, or guarantee)
+          const isFatal = i % 29 === 0;
+          let fatalReason = '';
+          let q1Status = 'PASS';
+          let q2Status = 'PASS';
+          let q3Status = 'PASS';
+          let q4Status = 'PASS';
+          let q5Status = 'PASS';
+
+          if (isFatal) {
+            const failType = i % 3;
+            if (failType === 0) {
+              q1Status = 'FAIL';
+              fatalReason = 'Calling number did not match registered phone in client master.';
+            } else if (failType === 1) {
+              q2Status = 'FAIL';
+              fatalReason = 'Pre-order authorization call took place after trade execution.';
+            } else {
+              q5Status = 'FAIL';
+              fatalReason = 'Advisor assured fixed return on market investment.';
+            }
+          }
+
+          const score = isFatal ? 0 : 5;
+
+          const transcript = `ADVISOR: Good morning Mr. ${clientName}, verifying your registered account ${clientCode} for pre-order compliance. CUSTOMER: Yes, this is ${clientCode}. ADVISOR: Confirming order for ${qty} shares of ${scrip.symbol} at Current Market Price around ${price}. Please confirm. CUSTOMER: Yes, confirmed. Please place the order. ADVISOR: Thank you sir, your order has been placed successfully. Have a great day.`;
+
+          // Insert Trade
+          insertTrade.run(
+            tradeId,
+            `TRD-2026-${String(tradeId).padStart(4, '0')}`,
+            adv.dealer,
+            adv.name,
+            adv.team,
+            tradeDate,
+            tradeTime,
+            clientName,
+            clientCode,
+            phone,
+            phone,
+            phone,
+            scrip.symbol,
+            'BUY',
+            qty,
+            price,
+            now
+          );
+
+          // Insert Call
+          insertCall.run(
+            callId,
+            `CALL-2026-${String(callId).padStart(4, '0')}`,
+            `HYD12-T10-${1785800000 + callId * 36}.${110000 + callId}.mp3`,
+            `calls/HYD12-T10-${1785800000 + callId * 36}.${110000 + callId}.mp3`,
+            adv.dealer,
+            adv.name,
+            adv.team,
+            clientName,
+            clientCode,
+            phone,
+            phone,
+            phone,
+            phone,
+            phone,
+            adv.name,
+            callDate,
+            callTime,
+            duration,
+            'audited',
+            'pre_order',
+            0.98,
+            transcript,
+            now,
+            now
+          );
+
+          // Insert Match
+          insertMatch.run(callId, tradeId, 0.98, 100, now);
+
+          // Insert Audit & Scorecard
+          insertAudit.run(
+            auditId,
+            callId,
+            tradeId,
+            isFatal ? 'FAIL' : 'PASS',
+            score,
+            isFatal ? `FATAL: ${fatalReason}` : 'Pre-order confirmation verified compliant with regulatory norms.',
+            now,
+            now
+          );
+
+          insertScorecard.run(
+            auditId,
+            auditId,
+            callId,
+            adv.name,
+            adv.dealer,
+            adv.team,
+            clientName,
+            clientCode,
+            phone,
+            phone,
+            phone,
+            tradeDate,
+            callDate,
+            score,
+            isFatal ? 1 : 0,
+            fatalReason,
+            q1Status,
+            q1Status === 'PASS' ? `Calling number ${phone} verified registered.` : 'Unregistered contact.',
+            q2Status,
+            q2Status === 'PASS' ? `Pre-order call at ${callTime} preceded trade at ${tradeTime}.` : 'Timing breach.',
+            q3Status,
+            `${scrip.symbol} ${qty} shares @ CMP ${price} explicitly articulated.`,
+            q4Status,
+            'Customer gave verbal affirmative consent.',
+            q5Status,
+            q5Status === 'PASS' ? 'Zero guaranteed returns or profit promises.' : 'Guaranteed profit claimed.',
+            isFatal ? `FATAL violation: ${fatalReason}` : 'Pre Order Confirmation is as per the Regulatory Norm.',
+            now,
+            now,
+            now
+          );
+        }
+
+        db.exec('COMMIT;');
+        console.log(`[PreOrder Seed] Successfully populated Pre-Order Regulatory Desk with full dataset of ${targetCalls} calls!`);
+      } catch (err: any) {
+        db.exec('ROLLBACK;');
+        console.error('[PreOrder Seed] Transaction error during bulk seeding:', err?.message);
+      }
+    }
   } catch (err: any) {
     console.error('[PreOrder Seed] Notice during seeding:', err?.message);
   }
 }
+
