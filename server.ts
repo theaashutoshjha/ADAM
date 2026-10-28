@@ -3778,9 +3778,8 @@ async function startServer() {
     const wsId = user.workspace_id || 'preorder_desk';
     const wsDef = getWorkspaceById(wsId) || WORKSPACES[0];
 
-    // Administrators can access any workspace; standard quality users must access their designated desk
+    // Enforce target workspace validation when client explicitly specifies a target desk
     if (
-      user.role !== 'admin' &&
       requestedWorkspace &&
       requestedWorkspace !== 'auto' &&
       requestedWorkspace !== wsId

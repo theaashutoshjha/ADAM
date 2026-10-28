@@ -87,6 +87,15 @@ export const WORKSPACES: WorkspaceDefinition[] = [
       password: process.env.ADMIN_PASSWORD || 'Fi*119147',
       role: 'Quality',
     },
+    additionalUsers: [
+      {
+        username: 'admin@fundsindia.com',
+        email: 'admin@fundsindia.com',
+        full_name: 'Compliance Administrator',
+        password: process.env.ADMIN_PASSWORD || 'Fi*119147',
+        role: 'admin',
+      },
+    ],
     starterParameters: [
       {
         param_key: 'Q1',

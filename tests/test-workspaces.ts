@@ -45,11 +45,11 @@ async function runTests() {
   initAllWorkspaces(primaryDb);
   console.log('✓ All 9 Workspaces initialized successfully.');
 
-  // 2. Verify all 9 users are provisioned in primary DB
+  // 2. Verify all workspace users are provisioned in primary DB
   const users = primaryDb.prepare('SELECT username, email, role, workspace_id FROM users').all() as any[];
   console.log(`✓ Provisioned ${users.length} users in primary DB.`);
-  if (users.length !== 9) {
-    throw new Error(`Expected 9 users, found ${users.length}`);
+  if (users.length < WORKSPACES.length) {
+    throw new Error(`Expected at least ${WORKSPACES.length} users, found ${users.length}`);
   }
 
   // Verify each workspace user exists

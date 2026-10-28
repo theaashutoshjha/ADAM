@@ -312,17 +312,7 @@ export async function stage7AuditCall(
     } catch {}
   }
 
-  // SEBI Order Confirmation on Recorded Registered Line:
-  // If the client places/confirms the trade on their verified 10-digit registered CLI:
-  let cliOrderConfirmed = false;
-  if (expectedUcc && !uccRes.matched && !sessionAuthenticated && isCust10 && (normCalling === normRegistered || comparePhoneNumbers(normCalling, normRegistered))) {
-    const tr = transcript || '';
-    if (/(?:\b(?:buy|sell|order\s*placed|place\s*the\s*order|done|executed|theek\s*hai|confirm|kar\s*do|le\s*lo|daal\s*do|put\s*order|cmp|market\s*price|shares?|lots?|target|holdings?|exit|loss|profit|liquidate|liquid|credit|investing|funds?|credits?|portfolio|investment|capital|options?|futures?|delivery|intraday|go\s*ahead|strike|premium)\b|कन्फर्मेशन|करंट\s*मार्केट|टारगेट|एग्जीक्यूट|ऑर्डर|खरीद|बेच|डाल\s*दो|ले\s*लो|ठीक\s*है|प्रॉफिट|मार्केट|कर\s*(?:दीजिए|दो|देना|देंगे|दूँ|दू)|चलने\s*दो|करवाना|लगा\s*दो|निकाल\s*लो|बेचना|लेना|डालना|डिलीवरी|इंट्राडे|प्रीमियम|स्ट्राइक|फंड्स|क्रेडिट)/i.test(tr)) {
-      cliOrderConfirmed = true;
-    }
-  }
-
-  if (expectedUcc && !uccRes.matched && !sessionAuthenticated && !cliOrderConfirmed) {
+  if (expectedUcc && !uccRes.matched && !sessionAuthenticated) {
     q2Result = {
       status: 'FAIL',
       flag: 'FATAL',
@@ -339,9 +329,7 @@ export async function stage7AuditCall(
       ? ` Client code "${expectedUcc}" confirmed in dialogue: "${uccRes.evidence}".`
       : (sessionAuthenticated
         ? ` ${sessionEvidence}`
-        : (cliOrderConfirmed
-          ? ` Client identity verified via authenticated registered phone (${normCalling}) and order confirmation dialogue.`
-          : (expectedUcc ? ` Client code ${expectedUcc} identified from matched pre-order trade record.` : '')));
+        : (expectedUcc ? ` Client code ${expectedUcc} identified from matched pre-order trade record.` : ''));
     q2Result = {
       status: 'PASS',
       flag: isTimingCompliant ? undefined : 'NON_FATAL',

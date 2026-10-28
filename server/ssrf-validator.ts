@@ -105,9 +105,9 @@ export async function validateSafeUrl(
     return { isSafe: false, error: 'Malformed or unparseable URL' };
   }
 
-  // 1. Strict Protocol Enforcement: HTTPS or HTTP permitted for telephony & external audio
-  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-    return { isSafe: false, error: `Insecure protocol "${parsed.protocol}". Only HTTPS and HTTP are permitted.` };
+  // 1. Strict Protocol Enforcement: HTTPS strictly required for telephony & external audio
+  if (parsed.protocol !== 'https:') {
+    return { isSafe: false, error: `Insecure protocol "${parsed.protocol}". Only HTTPS is permitted.` };
   }
 
   const hostname = parsed.hostname.toLowerCase();
