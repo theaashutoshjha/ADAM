@@ -3350,7 +3350,7 @@ async function startServer() {
   // Workspace Database Isolation Middleware
   // Resolves user's assigned workspace and activates their isolated database
   // -------------------------------------------------------------
-  app.use((req: Request, _res: Response, next: NextFunction) => {
+  app.use((req: Request, res: Response, next: NextFunction) => {
     let workspaceId = 'preorder_desk';
     const customWs = (req.headers['x-auditeq-workspace'] as string) || (req.headers['x-auditeq-database'] as string);
     const queryWs = (req.query.workspace as string) || (req.query.db as string);
@@ -3375,19 +3375,32 @@ async function startServer() {
         const u = primarySqlite
           .prepare('SELECT id, username, email, role, workspace_id FROM users WHERE token = ? AND (token_expires_at IS NULL OR token_expires_at > ?)')
           .get(token.trim(), new Date().toISOString()) as any;
-        if (u && u.workspace_id) {
-          workspaceId = u.workspace_id;
+        if (u) {
+          (req as any).user = u;
+          // Global Compliance Admin can view any desk by passing customWs
+          if (u.role === 'admin') {
+            if (customWs && customWs !== 'auto') {
+              workspaceId = customWs.trim();
+            } else if (u.workspace_id) {
+              workspaceId = u.workspace_id;
+            }
+          } else {
+            // Quality users are strictly and immutably locked to their assigned workspace desk
+            workspaceId = u.workspace_id || 'preorder_desk';
+          }
         }
       } catch {}
-    } else if (customWs && typeof customWs === 'string' && customWs.trim()) {
+    } else if (customWs && typeof customWs === 'string' && customWs.trim() && customWs !== 'auto') {
       workspaceId = customWs.trim();
-    } else if (queryWs && typeof queryWs === 'string' && queryWs.trim()) {
+    } else if (queryWs && typeof queryWs === 'string' && queryWs.trim() && queryWs !== 'auto') {
       workspaceId = queryWs.trim();
     }
 
     const targetDb = getWorkspaceDb(workspaceId);
     (req as any).currentWorkspaceId = workspaceId;
     (req as any).currentWorkspaceDb = targetDb;
+
+    res.setHeader('X-AuditEQ-Active-Workspace', workspaceId);
 
     workspaceAsyncStorage.run(targetDb, () => {
       currentWorkspaceIdStorage.run(workspaceId, () => {
@@ -3487,9 +3500,10 @@ async function startServer() {
   // -----------------------------------------------------------
   // Complete Server Operational Data Reset & Purge Endpoint (ADMIN ONLY)
   // -----------------------------------------------------------
-  apiRouter.post('/system/reset-all-data', requireAuth, requireRole(['admin']), async (_req: Request, res: Response) => {
+  apiRouter.post('/system/reset-all-data', requireAuth, requireRole(['admin', 'Quality']), async (req: Request, res: Response) => {
     try {
-      console.log('[System] Resetting all operational server data...');
+      const activeWs = (req as any).currentWorkspaceId || currentWorkspaceIdStorage.getStore() || 'preorder_desk';
+      console.log(`[System] Resetting operational data for workspace: ${activeWs}`);
       sqlite.exec('PRAGMA foreign_keys = OFF;');
       const tables = [
         'calls', 'trades', 'matches', 'audits', 'scorecards', 'jobs', 'logs',
@@ -3513,33 +3527,22 @@ async function startServer() {
         sqlite.exec('VACUUM;');
       } catch {}
 
-      // Clean uploads directory
-      if (fs.existsSync(UPLOADS_DIR)) {
-        const files = fs.readdirSync(UPLOADS_DIR);
+      // Clean uploads directory for THIS WORKSPACE ONLY
+      const wsUploadDir = path.join(UPLOADS_DIR, activeWs);
+      if (fs.existsSync(wsUploadDir)) {
+        const files = fs.readdirSync(wsUploadDir);
         for (const file of files) {
           try {
-            fs.unlinkSync(path.join(UPLOADS_DIR, file));
+            fs.unlinkSync(path.join(wsUploadDir, file));
           } catch {}
         }
       }
 
-      // Clean backup databases in .data
-      if (fs.existsSync(path.dirname(DB_PATH))) {
-        const dataDir = path.dirname(DB_PATH);
-        const dataFiles = fs.readdirSync(dataDir);
-        for (const df of dataFiles) {
-          if (df.includes('backup') || df.includes('.bak')) {
-            try {
-              fs.unlinkSync(path.join(dataDir, df));
-            } catch {}
-          }
-        }
-      }
-
-      console.log('[System] All server operational data successfully wiped by Administrator.');
+      console.log(`[System] Operational data for workspace "${activeWs}" successfully wiped.`);
       return res.json({
         ok: true,
-        message: 'All operational data deleted successfully. The server is completely clean and ready for new data.',
+        workspace_id: activeWs,
+        message: `All operational data for workspace "${activeWs}" deleted successfully. All other workspaces remain completely untouched.`,
       });
     } catch (err: any) {
       console.error('[System] Failed to wipe server data:', err);
@@ -9569,7 +9572,7 @@ ${call.transcript || '(No speech transcript recorded)'}
     return (apiRouter as any).handle({ ...req, url: '/reports/export' }, res);
   });
 
-  apiRouter.post('/maintenance/archive-clear', requireAuth, requireRole(['admin']), (req: Request, res: Response) => {
+  apiRouter.post('/maintenance/archive-clear', requireAuth, requireRole(['admin', 'Quality']), (req: Request, res: Response) => {
     const parseResult = ArchivePeriodSchema.safeParse(req.body);
     const label = parseResult.success && parseResult.data.label ? parseResult.data.label : `Period Close ${new Date().toISOString().slice(0, 10)}`;
 
@@ -9597,7 +9600,7 @@ ${call.transcript || '(No speech transcript recorded)'}
         `sha256_${sha256}`
       );
 
-    // Clear live operational data cleanly
+    // Clear live operational data cleanly for this workspace only
     sqlite.prepare('DELETE FROM jobs').run();
     sqlite.prepare('DELETE FROM matches').run();
     sqlite.prepare('DELETE FROM audits').run();
@@ -9605,16 +9608,21 @@ ${call.transcript || '(No speech transcript recorded)'}
     sqlite.prepare('DELETE FROM trades').run();
     sqlite.prepare('DELETE FROM calls').run();
 
-    addLog('info', 'ARCHIVE_PERIOD_CLOSED', `Period closed and archived under ${archiveKey}. Cryptographic SHA-256 seal: ${sha256}`);
+    const activeWs = (req as any).currentWorkspaceId || currentWorkspaceIdStorage.getStore() || 'preorder_desk';
+    addLog('info', 'ARCHIVE_PERIOD_CLOSED', `Period closed and archived under ${archiveKey} for workspace "${activeWs}". Cryptographic SHA-256 seal: ${sha256}`);
     return res.json({
       ok: true,
+      workspace_id: activeWs,
       archive_key: archiveKey,
       bundle_hash: `sha256_${sha256}`,
       message: `Operational data archived (${manifest.counts.scorecards} scored records) with full cryptographic SHA-256 manifest seal. Live workspace reset.`,
     });
   });
 
-  apiRouter.post('/maintenance/permanent-clear', requireAuth, requireRole(['admin']), (_req: Request, res: Response) => {
+  apiRouter.post('/maintenance/permanent-clear', requireAuth, requireRole(['admin', 'Quality']), (req: Request, res: Response) => {
+    const activeWs = (req as any).currentWorkspaceId || currentWorkspaceIdStorage.getStore() || 'preorder_desk';
+    console.log(`[Maintenance] Permanently purging live data for workspace: ${activeWs}`);
+
     const tablesToPurge = [
       'jobs',
       'matches',
@@ -9649,41 +9657,25 @@ ${call.transcript || '(No speech transcript recorded)'}
     try { sqlite.exec('PRAGMA wal_checkpoint(TRUNCATE);'); } catch {}
     try { sqlite.prepare('VACUUM').run(); } catch {}
 
+    // Delete ONLY uploads for this specific workspace
     try {
-      if (fs.existsSync(UPLOADS_DIR)) {
-        const files = fs.readdirSync(UPLOADS_DIR);
+      const wsUploadDir = path.join(UPLOADS_DIR, activeWs);
+      if (fs.existsSync(wsUploadDir)) {
+        const files = fs.readdirSync(wsUploadDir);
         for (const f of files) {
-          try { fs.unlinkSync(path.join(UPLOADS_DIR, f)); } catch {}
+          try { fs.unlinkSync(path.join(wsUploadDir, f)); } catch {}
         }
       }
-      const backupsDir = path.resolve('.data', 'backups');
-      if (fs.existsSync(backupsDir)) {
-        const bFiles = fs.readdirSync(backupsDir);
-        for (const bf of bFiles) {
-          try { fs.unlinkSync(path.join(backupsDir, bf)); } catch {}
-        }
-      }
-      const databasesDir = path.resolve('.data', 'databases');
-      if (fs.existsSync(databasesDir)) {
-        const dbFiles = fs.readdirSync(databasesDir);
-        for (const df of dbFiles) {
-          try { fs.unlinkSync(path.join(databasesDir, df)); } catch {}
-        }
-      }
-      // Purge any lingering database backup file so cleared data NEVER resurrects
-      const dataDir = path.resolve('.data');
-      if (fs.existsSync(dataDir)) {
-        const dFiles = fs.readdirSync(dataDir);
-        for (const df of dFiles) {
-          if (df.includes('backup') || df.endsWith('.bak') || df.includes('auditeq_backup_latest')) {
-            try { fs.unlinkSync(path.join(dataDir, df)); } catch {}
-          }
-        }
-      }
-    } catch {}
+    } catch (e: any) {
+      console.warn(`[Maintenance] Notice purging uploads for workspace ${activeWs}:`, e?.message);
+    }
 
-    addLog('warning', 'WORKSPACE_PERMANENT_PURGE', 'Operational workspace, uploads, and all database backups permanently purged.');
-    return res.json({ ok: true, message: 'All live operational records, CSV files, backup snapshots, and audio uploads permanently cleared from server.' });
+    addLog('warning', 'WORKSPACE_PERMANENT_PURGE', `Workspace "${activeWs}" live calls, audits, scorecards and audio recordings permanently purged.`);
+    return res.json({
+      ok: true,
+      workspace_id: activeWs,
+      message: `Workspace "${activeWs}" live records and uploaded files permanently wiped. All other workspaces remain completely untouched.`,
+    });
   });
 
   // -----------------------------------------------------------
