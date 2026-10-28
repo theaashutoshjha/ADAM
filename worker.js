@@ -322,41 +322,26 @@ async function handleCloudflareEdgeApi(request, url) {
   if (path === '/pipeline/stats' || path === '/stats') {
     const wsId = resolveWorkspaceId(request, url);
     const wsData = getWorkspaceData(wsId);
-    if (wsId === 'preorder_desk') {
-      return json({
-        total_calls: 1177,
-        pre_order_calls: 1177,
-        regular_calls: 0,
-        scrap_calls: 0,
-        processed_calls: 1177,
-        matched_trades: 1182,
-        fatal_breaches: 42,
-        compliance_rate: 96.4,
-        average_score: 4.8,
-        calls: 1177,
-        trades: 1182,
-        matched: 1194,
-        audited: 1177,
-        scored: 1177,
-        running: false,
-      });
-    }
 
     const totalCalls = wsData.calls.length;
     const scoredCount = wsData.scorecards.length;
+    const preOrderCalls = wsData.calls.filter(c => c.call_type === 'pre_order' || c.classification === 'PRE_ORDER').length;
+    const scrapCalls = wsData.calls.filter(c => c.call_type === 'scrap' || c.classification === 'SCRAP' || c.is_scrap).length;
+    const regularCalls = Math.max(0, totalCalls - preOrderCalls - scrapCalls);
+    const fatalBreaches = wsData.scorecards.filter(s => s.is_fatal || s.overall_status === 'FATAL_FAIL').length;
     const avgScore = scoredCount > 0 
       ? +(wsData.scorecards.reduce((sum, s) => sum + (s.final_score || s.score || 0), 0) / scoredCount).toFixed(1)
       : 0;
 
     return json({
       total_calls: totalCalls,
-      pre_order_calls: 0,
-      regular_calls: totalCalls,
-      scrap_calls: 0,
+      pre_order_calls: preOrderCalls,
+      regular_calls: regularCalls,
+      scrap_calls: scrapCalls,
       processed_calls: scoredCount,
       matched_trades: wsData.trades.length,
-      fatal_breaches: wsData.scorecards.filter(s => s.is_fatal).length,
-      compliance_rate: totalCalls > 0 ? +((scoredCount / totalCalls) * 100).toFixed(1) : 100,
+      fatal_breaches: fatalBreaches,
+      compliance_rate: totalCalls > 0 ? +(((totalCalls - fatalBreaches) / totalCalls) * 100).toFixed(1) : 100,
       average_score: avgScore,
       calls: totalCalls,
       trades: wsData.trades.length,
@@ -477,8 +462,8 @@ async function handleCloudflareEdgeApi(request, url) {
           name: ws.db,
           display_name: ws.name,
           category: ws.category,
-          size_kb: ws.id === 'preorder_desk' ? 2560 : 128 + d.calls.length * 10,
-          records_count: ws.id === 'preorder_desk' ? 1177 : d.calls.length,
+          size_kb: 128 + d.calls.length * 10,
+          records_count: d.calls.length,
           status: 'CONNECTED',
         };
       }),

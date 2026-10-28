@@ -3986,18 +3986,19 @@ async function startServer() {
     const scoredCount = scorecardCount > 0 ? scorecardCount : auditCount;
 
     // Regulatory Compliance Mandate: Audited Pre-Order count reflects verified pre-order trade clusters
-    let preorderCalls = 1177;
-    let mailConfirmationsCount = 296;
-    let totalOrdersCount = 1473;
+    const preorderCallsRow = sqlite.prepare("SELECT COUNT(*) as c FROM calls WHERE call_type = 'pre_order' OR classification = 'PRE_ORDER'").get() as { c: number };
+    let preorderCalls = preorderCallsRow?.c || 0;
+    let mailConfirmationsCount = (sqlite.prepare("SELECT COUNT(*) as c FROM calls WHERE call_type = 'mail_confirmation' OR classification = 'MAIL_CONFIRMATION'").get() as { c: number })?.c || 0;
+    let totalOrdersCount = tradeCount;
     try {
       const summary = getPreOrdersAnalysisFromDb(sqlite);
       if (summary && summary.total_pre_orders) {
         preorderCalls = summary.total_pre_orders;
-        mailConfirmationsCount = summary.mail_confirmations_count || 296;
-        totalOrdersCount = summary.total_orders || 1473;
+        mailConfirmationsCount = summary.mail_confirmations_count || 0;
+        totalOrdersCount = summary.total_orders || tradeCount;
       }
     } catch {
-      preorderCalls = scoredCount > 0 ? scoredCount : 1177;
+      preorderCalls = scoredCount > 0 ? scoredCount : (preorderCallsRow?.c || 0);
     }
 
     const scrapCalls = (sqlite.prepare("SELECT COUNT(*) as c FROM calls WHERE (call_type = 'scrap' OR classification = 'SCRAP' OR scrap_reason IS NOT NULL OR (duration_seconds > 0 AND duration_seconds < 6)) AND id NOT IN (SELECT call_id FROM audits)").get() as { c: number }).c;

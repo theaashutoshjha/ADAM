@@ -1,0 +1,5 @@
+# AuditEQ / ADAM-AR: Production Audio Transcription & Dynamic Order Extraction Pipeline
+aiohttp>=3.9.0
+python-dotenv>=1.0.0
+tqdm>=4.66.0
+openai>=1.12.0

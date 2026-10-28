@@ -523,28 +523,9 @@ Return ONLY a valid JSON object matching this schema:
       });
 
       return result;
-    } catch {
-      // Deterministic fallback verification
-      const lower = transcript.toLowerCase();
-      const symClean = trade.symbol.toLowerCase().replace(/-(?:eq|be|sm|bz|bl|st)$/i, '');
-      const scripMentioned = lower.includes(symClean);
-      const qtyStr = String(trade.quantity);
-      const quantityMentioned = lower.includes(qtyStr) || lower.includes(`${qtyStr} shares`);
-      const priceOrCmpMentioned = lower.includes('cmp') || lower.includes('market') || (trade.price ? lower.includes(String(Math.round(trade.price))) : false);
-      const customerAcknowledged = /\b(?:yes|yeah|okay|confirm|proceed|theek hai|kar do|daal do|sure)\b/i.test(lower);
-      const hasGuarantee = /\b(?:guarantee|100%\s*profit|fixed\s*return|zero\s*risk)\b/i.test(lower);
-
-      const isConfirmed = scripMentioned && (quantityMentioned || priceOrCmpMentioned) && customerAcknowledged;
-      return {
-        isConfirmed,
-        scripMentioned,
-        priceOrCmpMentioned: Boolean(priceOrCmpMentioned),
-        quantityMentioned,
-        customerAcknowledged,
-        noReturnCommitment: !hasGuarantee,
-        evidenceQuote: isConfirmed ? `Order for ${trade.symbol} confirmed in dialogue.` : '',
-        reason: isConfirmed ? 'Deterministic verification matched scrip, quantity/price, and customer acknowledgement.' : 'Order particulars or confirmation not clearly found.',
-      };
+    } catch (err: any) {
+      console.error(`[GeminiPool] verifyTradeOrder failed: ${err.message}`, err.stack);
+      throw new Error(`LLM_VERIFICATION_FAILED: ${err.message}`);
     }
   }
 
@@ -633,63 +614,9 @@ Return ONLY a valid JSON object matching this schema:
       });
 
       return result;
-    } catch {
-      // Deterministic fallback 5-point evaluation
-      const cleanCallPhone = (callMetadata.customerNumber || '').replace(/\D/g, '').slice(-10);
-      const cleanTradePhone = (tradeData.registeredNumber || '').replace(/\D/g, '').slice(-10);
-      const q1Pass = cleanCallPhone.length === 10 && cleanCallPhone === cleanTradePhone;
-
-      const parseSec = (t?: string) => {
-        if (!t) return 0;
-        const [h, m, s] = t.split(':').map((x) => parseInt(x, 10) || 0);
-        return h * 3600 + m * 60 + (s || 0);
-      };
-      const callTimeSec = parseSec(callMetadata.callTime);
-      const tradeTimeSec = parseSec(tradeData.orderTimestamp);
-      const q2Pass = !tradeTimeSec || (callTimeSec <= tradeTimeSec + 30);
-
-      const lower = transcript.toLowerCase();
-      const symClean = tradeData.symbol.toLowerCase().replace(/-(?:eq|be|sm|bz|bl|st)$/i, '');
-      const scripFound = lower.includes(symClean);
-      const qtyFound = lower.includes(String(tradeData.quantity));
-      const priceFound = lower.includes('cmp') || lower.includes('market') || (tradeData.price ? lower.includes(String(Math.round(tradeData.price))) : false);
-      const q3Pass = scripFound && (qtyFound || priceFound);
-
-      const q4Pass = /\b(?:yes|yeah|okay|confirm|proceed|theek hai|kar do|daal do|sure)\b/i.test(lower);
-      const hasGuarantee = /\b(?:guarantee|100%\s*profit|fixed\s*return|zero\s*risk)\b/i.test(lower);
-      const q5Pass = !hasGuarantee;
-
-      const overall = (q1Pass && q2Pass && q5Pass && (q3Pass || q4Pass)) ? 'PASS' : 'FAIL';
-
-      return {
-        q1_registered_number: {
-          status: q1Pass ? 'PASS' : 'FAIL',
-          evidence: q1Pass ? `Customer phone ${cleanCallPhone} matches registered number.` : `Calling number ${cleanCallPhone} does not match trade registered number ${cleanTradePhone}.`,
-          reason: q1Pass ? 'Matched registered phone number.' : 'Non-registered phone number used.',
-        },
-        q2_regulatory_norms: {
-          status: q2Pass ? 'PASS' : 'FAIL',
-          evidence: q2Pass ? `Pre-order call (${callMetadata.callTime}) was placed before trade execution (${tradeData.orderTimestamp}).` : 'Call placed after trade execution.',
-          reason: q2Pass ? 'Pre Order Confirmation is as per the Regulatory Norms.' : 'Call placed after trade execution.',
-        },
-        q3_scrip_price_qty: {
-          status: q3Pass ? 'PASS' : 'FAIL',
-          evidence: q3Pass ? `Scrip (${tradeData.symbol}), quantity (${tradeData.quantity}), and price communicated.` : 'Trade parameters incomplete in dialogue.',
-          reason: q3Pass ? 'Was Script, price and quantity mentioned' : 'Missing trade parameters.',
-        },
-        q4_customer_acknowledged: {
-          status: q4Pass ? 'PASS' : 'FAIL',
-          evidence: q4Pass ? 'Customer explicitly authorized order execution in dialogue.' : 'No customer verbal acknowledgment.',
-          reason: q4Pass ? 'Customer Acknowledge the same?' : 'Customer acknowledgment missing.',
-        },
-        q5_no_return_commitment: {
-          status: q5Pass ? 'PASS' : 'FAIL',
-          evidence: q5Pass ? 'No return commitments or guaranteed profit promises made.' : 'Prohibited return commitment promised by advisor.',
-          reason: q5Pass ? "Wasn't there any Return Commitment ?" : 'Dealer promised return commitment.',
-        },
-        overall_compliance: overall,
-        summary: overall === 'PASS' ? 'Call fully complies with regulatory pre-order standards.' : 'Call failed regulatory compliance checks.',
-      };
+    } catch (err: any) {
+      console.error(`[GeminiPool] evaluateFivePointAudit failed: ${err.message}`, err.stack);
+      throw new Error(`LLM_AUDIT_EVALUATION_FAILED: ${err.message}`);
     }
   }
 }
