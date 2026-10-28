@@ -1306,6 +1306,15 @@ export function ensureWorkspaceSchema(db: DatabaseSync, workspaceId: string): vo
     ['status', 'TEXT'],
     ['matched_call_id', 'INTEGER'],
   ];
+  for (const [c, d] of tradeCols) addCol('trades', c, d);
+
+  // Matches columns migration
+  const matchCols: [string, string][] = [
+    ['verification_status', 'TEXT DEFAULT "confirmed"'],
+    ['updated_at', 'TEXT'],
+  ];
+  for (const [c, d] of matchCols) addCol('matches', c, d);
+
   // Logs columns migration
   const logCols: [string, string][] = [
     ['event', 'TEXT DEFAULT "system"'],

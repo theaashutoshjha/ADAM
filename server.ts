@@ -128,6 +128,7 @@ import {
   bulkSaveWorkspaceParameters,
   resetWorkspaceParameters,
 } from './server/workspace-service';
+import { seedPreorderWorkspaceData } from './server/preorder-seed';
 
 // Top-level crash protection: Distinguish transient socket/stream errors from fatal memory corruptions
 process.on('unhandledRejection', (reason) => {
@@ -283,6 +284,9 @@ primarySqlite.exec('PRAGMA mmap_size = 268435456;');
 
 // Initialize all 9 isolated workspaces & database connections
 initAllWorkspaces(primarySqlite);
+
+// Auto-seed baseline pre-order regulatory data if database is unpopulated
+seedPreorderWorkspaceData(primarySqlite);
 
 // Create transparent proxy over SQLite so all standard queries route to the current workspace database
 const sqlite = createWorkspaceDbProxy(primarySqlite);
