@@ -312,6 +312,83 @@ async function handleCloudflareEdgeApi(request, url) {
     ]);
   }
 
+  // 17b. Multi-Database Endpoints & Storage Engine
+  if (path === '/databases') {
+    return json({
+      ok: true,
+      databases: [
+        { id: 'preorder_desk', name: 'auditeq_production.db', display_name: 'Pre-order Regulatory Desk', size_kb: 2560, records_count: 528, status: 'CONNECTED' },
+        { id: 'equity_advisory', name: 'equity_advisory.db', display_name: 'Equity Advisory QA', size_kb: 1280, records_count: 210, status: 'CONNECTED' },
+        { id: 'hni_desk', name: 'hni_desk.db', display_name: 'HNI Relationship Desk', size_kb: 940, records_count: 145, status: 'CONNECTED' },
+        { id: 'algo_desk', name: 'algo_desk.db', display_name: 'Algo & Derivatives QA', size_kb: 850, records_count: 120, status: 'CONNECTED' },
+        { id: 'customer_support', name: 'customer_support.db', display_name: 'Customer support', size_kb: 1100, records_count: 180, status: 'CONNECTED' },
+        { id: 'mf_gold', name: 'mf_gold.db', display_name: 'MF Gold', size_kb: 720, records_count: 95, status: 'CONNECTED' },
+        { id: 'mf_silver', name: 'mf_silver.db', display_name: 'MF Silver', size_kb: 680, records_count: 85, status: 'CONNECTED' },
+        { id: 'mf_digital', name: 'mf_digital.db', display_name: 'MF Digital', size_kb: 590, records_count: 70, status: 'CONNECTED' },
+        { id: 'mf_onboarding', name: 'mf_onboarding.db', display_name: 'MF Onboarding', size_kb: 640, records_count: 80, status: 'CONNECTED' },
+      ],
+      current_database: 'auditeq_production.db',
+      status: 'CONNECTED',
+      storage_engine: 'SQLite 3.45 (WAL)',
+    });
+  }
+
+  if (path === '/databases/switch' && method === 'POST') {
+    let body = {};
+    try { body = await request.json(); } catch {}
+    return json({
+      ok: true,
+      active_database: body.database || 'auditeq_production.db',
+      message: `Switched active desk database to ${body.database || 'auditeq_production.db'}.`,
+    });
+  }
+
+  // 17c. Cleared Database Archives & Backups
+  if (path === '/admin/cleared-backups') {
+    return json({
+      ok: true,
+      backups: [
+        {
+          id: 1,
+          created_at: '2026-10-27T10:00:00Z',
+          cleared_by: 'Ashutosh Kumar',
+          calls_count: 314,
+          trades_count: 182,
+          audits_count: 142,
+        },
+      ],
+    });
+  }
+
+  if (path === '/admin/clear-database' && method === 'POST') {
+    return json({
+      ok: true,
+      message: 'Database snapshot archived safely before reset.',
+      archived_snapshot: true,
+      cleared_counts: { calls: 314, trades: 182, audits: 142 },
+    });
+  }
+
+  // 17d. Missing Call Trades (Manual Trade Audit)
+  if (path === '/trades/missing-calls') {
+    return json({
+      ok: true,
+      missing_trades: [],
+    });
+  }
+
+  // 17e. Health & Connectivity
+  if (path === '/health') {
+    return json({
+      ok: true,
+      status: 'healthy',
+      database: 'CONNECTED',
+      database_file: 'auditeq_production.db',
+      mode: 'Cloudflare Edge / SQLite Sync',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   // 18. File Uploads (Trade Data & Call Metadata)
   if (path.startsWith('/imports/')) {
     return json({
